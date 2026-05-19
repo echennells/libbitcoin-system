@@ -149,6 +149,16 @@ AC_ARG_ENABLE([shani],
     [enable_shani=no])
 AC_MSG_RESULT([$enable_shani])
 
+# Implement --enable-armv8-crypto.
+#------------------------------------------------------------------------------
+AC_MSG_CHECKING([--enable-armv8-crypto option])
+AC_ARG_ENABLE([armv8-crypto],
+    AS_HELP_STRING([--enable-armv8-crypto],
+        [Compile with ARMv8-A SHA crypto extensions (specifically -march=armv8-a+crypto) @<:@default=no@:>@]),
+    [enable_armv8_crypto=$enableval],
+    [enable_armv8_crypto=no])
+AC_MSG_RESULT([$enable_armv8_crypto])
+
 # Implement --enable-ndebug and define NDEBUG.
 #------------------------------------------------------------------------------
 AC_MSG_CHECKING([--enable-ndebug option])
@@ -333,6 +343,24 @@ AS_IF([test x${enable_shani} != "xno"],
             __m128i b = _mm_set1_epi32(15);
             __m128i k = _mm_set1_epi32(31);
             return _mm_extract_epi32(_mm_sha256msg2_epu32(_mm_sha256msg1_epu32(_mm_sha256rnds2_epu32(a, b, k), b), a), 2);
+          ]])])])
+
+AS_IF([test x${enable_armv8_crypto} != "xno"],
+    [AX_CHECK_COMPILE_FLAG([-march=armv8-a+crypto],
+        [AC_DEFINE([WITH_ARMV8_CRYPTO])
+         CXXFLAGS="$CXXFLAGS -march=armv8-a+crypto";
+         AC_SUBST([armv8_crypto], ["-march=armv8-a+crypto"])],
+        [AC_MSG_ERROR([-march=armv8-a+crypto not supported.])],
+        [],
+        [AC_LANG_PROGRAM(
+          [[
+            #include <arm_neon.h>
+          ]],
+          [[
+            uint32x4_t a = vdupq_n_u32(0);
+            uint32x4_t b = vdupq_n_u32(1);
+            uint32x4_t c = vsha256hq_u32(a, b, b);
+            return vgetq_lane_u32(c, 0);
           ]])])])
 
 AS_IF([test x${enable_sse41} != "xno"],

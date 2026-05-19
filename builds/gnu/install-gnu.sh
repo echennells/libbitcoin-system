@@ -14,8 +14,11 @@
 #                               Default: --disable-avx512
 # --<enable/disable>-sse41    Use SSE4.1 hardware instructions.
 #                               Default: --disable-sse41
-# --<enable/disable>-shani    Use Intel/ARM SHA Extensions.
+# --<enable/disable>-shani    Use Intel SHA Extensions (-msse4 -msha).
 #                               Default: --disable-shani
+# --<enable/disable>-armv8-crypto  Use ARMv8-A SHA crypto extensions
+#                               (-march=armv8-a+crypto).
+#                               Default: --disable-armv8-crypto
 # --build-boost               Build Boost libraries
 # --build-secp256k1           Build libsecp256k1 libraries
 # --build-src-dir=<path>      Location for sources.
@@ -869,8 +872,11 @@ help()
     msg "                              Default: --disable-avx512"
     msg "--<enable/disable>-sse41    Use SSE4.1 hardware instructions."
     msg "                              Default: --disable-sse41"
-    msg "--<enable/disable>-shani    Use Intel/ARM SHA Extensions."
+    msg "--<enable/disable>-shani    Use Intel SHA Extensions (-msse4 -msha)."
     msg "                              Default: --disable-shani"
+    msg "--<enable/disable>-armv8-crypto  Use ARMv8-A SHA crypto extensions"
+    msg "                              (-march=armv8-a+crypto)."
+    msg "                              Default: --disable-armv8-crypto"
     msg "--build-boost               Build Boost libraries"
     msg "--build-secp256k1           Build libsecp256k1 libraries"
     msg "--build-src-dir=<path>      Location for sources."
