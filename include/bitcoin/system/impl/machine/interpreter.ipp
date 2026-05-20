@@ -990,7 +990,10 @@ inline error::op_error_t CLASS::
 op_check_sig() NOEXCEPT
 {
     const auto ec = op_check_sig_verify();
-    if (ec == error::op_check_sig_empty_key)
+
+    // BIP342: empty public key MUST fail script and end.
+    const auto bip342 = state::is_enabled(flags::bip342_rule);
+    if (bip342 && ec == error::op_check_sig_empty_key)
         return ec;
 
     // BIP66: if DER encoding invalid script MUST fail and end.
