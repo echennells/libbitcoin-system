@@ -23,11 +23,38 @@
 #include <bitcoin/system/chain/output.hpp>
 #include <bitcoin/system/chain/transaction.hpp>
 #include <bitcoin/system/define.hpp>
+#include <bitcoin/system/hash/hash.hpp>
 #include <bitcoin/system/stream/stream.hpp>
 
 namespace libbitcoin {
 namespace system {
 namespace chain {
+
+namespace {
+
+// Display-only witness hash (wtxid) for the bitcoind verbose "hash" field.
+// transaction::hash(true) short-circuits a segregated coinbase to null_hash
+// per BIP141 (the witness-merkle commitment leaf), but Bitcoin Core's
+// displayed "hash" (getrawtransaction/TxToUniv) is GetWitnessHash() with no
+// coinbase special case: a real, non-null wtxid. This recomputes it directly
+// from the witnessed serialization, bypassing that guard. It does not touch
+// the witness-merkle commitment path, which legitimately uses null for the
+// coinbase leaf via transaction::hash(true)/get_hash(true). For a
+// non-segregated tx, to_data collapses to the non-witness serialization
+// (witness &= segregated_), so this yields the txid, matching Core.
+BC_PUSH_WARNING(NO_THROW_IN_NOEXCEPT)
+inline hash_digest display_wtxid(const transaction& tx) NOEXCEPT
+{
+    hash_digest digest{};
+    stream::out::fast stream{ digest };
+    hash::sha256x2::fast sink{ stream };
+    tx.to_data(sink, true);
+    sink.flush();
+    return digest;
+}
+BC_POP_WARNING()
+
+} // namespace
 
 DEFINE_JSON_TO_TAG(transaction)
 {
@@ -74,8 +101,14 @@ DEFINE_JSON_FROM_TAGGED(bitcoind_tag, transaction)
     {
         { "hex", value_from(bitcoind_embedded(tx)) },
         { "txid", encode_hash(tx.hash(false)) },
-        { "hash", encode_hash(tx.hash(true)) },
-        { "size", tx.serialized_size(false) },
+
+        // ECH-38: Core's displayed witness hash is a real wtxid even for a
+        // witness coinbase (tx.hash(true) would short-circuit to null_hash).
+        { "hash", encode_hash(display_wtxid(tx)) },
+
+        // ECH-39: Core "size" is the witness-included total (GetTotalSize),
+        // i.e. serialized_size(true); serialized_size(false) is base-only.
+        { "size", tx.serialized_size(true) },
         { "vsize", tx.virtual_size() },
         { "weight", tx.weight() },
         { "version", tx.version() },

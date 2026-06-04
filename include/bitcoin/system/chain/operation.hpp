@@ -133,6 +133,11 @@ public:
     // TODO: move to config serialization wrapper.
     std::string to_string(uint32_t active_flags) const NOEXCEPT;
 
+    // Bitcoin Core (ScriptToAsmStr / GetOpName) compatible rendering.
+    // bitcoind=false delegates to the native overload (byte-identical).
+    std::string to_string(uint32_t active_flags,
+        bool bitcoind) const NOEXCEPT;
+
     /// Properties.
     /// -----------------------------------------------------------------------
 
