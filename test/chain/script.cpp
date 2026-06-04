@@ -1135,4 +1135,19 @@ BOOST_AUTO_TEST_CASE(script__verify__bip143_no_find_and_delete_tx__success)
     BOOST_REQUIRE_EQUAL(tx.connect({ flags::bip16_rule | flags::bip141_rule }, 0), error::op_check_sig_verify4);
 }
 
+// A v1 (taproot) witness program: OP_1 <32-byte push>. Regression for the
+// is_pay_witness_taproot_pattern fix (it previously checked push_size_1 (0x01)
+// instead of push_positive_1 (OP_1, 0x51), so taproot outputs were never
+// classified and output_pattern() returned non_standard).
+BOOST_AUTO_TEST_CASE(script__pattern__p2tr_output__pay_witness_v1_taproot)
+{
+    const script instance(base16_chunk(
+        "512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"),
+        false);
+    BOOST_REQUIRE(instance.is_valid());
+    BOOST_REQUIRE(chain::script::is_pay_witness_taproot_pattern(instance.ops()));
+    BOOST_REQUIRE(instance.output_pattern() ==
+        chain::script_pattern::pay_witness_v1_taproot);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

@@ -180,8 +180,10 @@ constexpr bool script::is_pay_witness_script_hash_pattern(
 constexpr bool script::is_pay_witness_taproot_pattern(
     const operations& ops) NOEXCEPT
 {
+    // A v1 (taproot) witness program is OP_1 (push_positive_1, 0x51) followed
+    // by a 32-byte push -- NOT push_size_1 (0x01), which is a 1-byte data push.
     return ops.size() == 2
-        && ops[0].code() == opcode::push_size_1
+        && ops[0].code() == opcode::push_positive_1
         && ops[1].code() == opcode::push_size_32;
 }
 
