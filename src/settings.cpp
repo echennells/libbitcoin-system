@@ -74,6 +74,8 @@ settings::settings() NOEXCEPT
 settings::settings(chain::selection context) NOEXCEPT
   : settings()
 {
+    selection = context;
+
     switch (context)
     {
         case chain::selection::mainnet:

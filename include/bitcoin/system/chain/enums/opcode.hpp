@@ -319,6 +319,12 @@ BC_API std::string opcode_to_hexadecimal(opcode code) NOEXCEPT;
 BC_API bool opcode_from_hexadecimal(opcode& out_code,
     const std::string_view& value) NOEXCEPT;
 
+/// Convert the opcode to the bitcoind (script/script.cpp GetOpName) asm
+/// mnemonic. Fork-independent (active_forks accepted for signature parity with
+/// opcode_to_mnemonic but unused, as GetOpName ignores fork state).
+BC_API std::string opcode_to_bitcoind(opcode value,
+    uint32_t active_forks) NOEXCEPT;
+
 } // namespace chain
 } // namespace system
 } // namespace libbitcoin

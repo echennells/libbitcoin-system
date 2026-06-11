@@ -115,7 +115,6 @@ BOOST_AUTO_TEST_CASE(transaction__json__conversions__expected)
 
 
 // mainnet block 840000 coinbase.
-// TODO: output script (type/address/asm) parity.
 static const auto block840000_coinbase = base16_chunk(
     "0100000000010100000000000000000000000000000000000000000000000000"
     "00000000000000ffffffff600340d10c192f5669614254432f4d696e65642062"
@@ -154,7 +153,35 @@ BOOST_AUTO_TEST_CASE(transaction__bitcoind__witness_coinbase_840000__size_and_wi
     BOOST_REQUIRE(vin.at(0u).as_object().contains("coinbase"));
     BOOST_REQUIRE(!vin.at(0u).as_object().contains("txid"));
 
-    BOOST_REQUIRE_EQUAL(object.at("vout").as_array().size(), 3u);
+    const auto& vout = object.at("vout").as_array();
+    BOOST_REQUIRE_EQUAL(vout.size(), 3u);
+
+    const auto& script0 = vout.at(0u).as_object().at("scriptPubKey").as_object();
+    BOOST_REQUIRE_EQUAL(script0.at("type").as_string(), "pubkeyhash");
+    BOOST_REQUIRE_EQUAL(script0.at("asm").as_string(),
+        "OP_DUP OP_HASH160 536ffa992491508dca0354e52f32a3a7a679a53a"
+        " OP_EQUALVERIFY OP_CHECKSIG");
+    BOOST_REQUIRE_EQUAL(script0.at("address").as_string(),
+        "18cBEMRxXHqzWWCxZNtU91F5sbUNKhL5PX");
+
+    const auto& script1 = vout.at(1u).as_object().at("scriptPubKey").as_object();
+    BOOST_REQUIRE_EQUAL(script1.at("type").as_string(), "nulldata");
+    BOOST_REQUIRE(!script1.contains("address"));
+    BOOST_REQUIRE(!script1.contains("addresses"));
+}
+
+// The address context threads from the transaction wrapper to its outputs.
+BOOST_AUTO_TEST_CASE(transaction__bitcoind__witness_coinbase_840000_testnet3__testnet_address)
+{
+    const transaction tx{ block840000_coinbase, true };
+    BOOST_REQUIRE(tx.is_valid());
+
+    const auto context = to_address_context(selection::testnet3);
+    const auto value = json::value_from(bitcoind(tx, context));
+    const auto& vout = value.as_object().at("vout").as_array();
+    const auto& script0 = vout.at(0u).as_object().at("scriptPubKey").as_object();
+    BOOST_REQUIRE_EQUAL(script0.at("address").as_string(),
+        "mo88XQWwLKHFHcgaGwrqxvTQjb55E8TstY");
 }
 
 BOOST_AUTO_TEST_SUITE_END()
