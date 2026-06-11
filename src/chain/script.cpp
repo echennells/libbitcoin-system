@@ -353,16 +353,14 @@ void script::to_data(writer& sink, bool prefix) const NOEXCEPT
 }
 
 std::string script::to_string(uint32_t active_flags,
-    bool /* bitcoind */) const NOEXCEPT
+    bool bitcoind) const NOEXCEPT
 {
-    // TODO: incorporate bitcoind option.
-
     auto first = true;
     std::ostringstream text{};
     for (const auto& op: ops())
     {
-        // Throwing stream aborts.
-        text << (first ? "" : " ") << op.to_string(active_flags);
+        // Throwing stream aborts. bitcoind=false yields native formatting.
+        text << (first ? "" : " ") << op.to_string(active_flags, bitcoind);
         first = false;
     }
 

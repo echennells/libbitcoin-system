@@ -476,6 +476,33 @@ std::string operation::to_string(uint32_t active_flags) const NOEXCEPT
         encode_base16(get_data()) + "]";
 }
 
+// bitcoind (ScriptToAsmStr/GetOpName) compatible rendering.
+std::string operation::to_string(uint32_t active_flags,
+    bool bitcoind) const NOEXCEPT
+{
+    // Native path remains byte-identical to the single-arg overload.
+    if (!bitcoind)
+        return to_string(active_flags);
+
+    if (!is_valid())
+        return "?";
+
+    // Trailing undersized push: bitcoind renders unparsed tail bytes as bare
+    // lowercase hex (no delimiters).
+    if (underflow_)
+        return encode_base16(get_data());
+
+    // Data push: bitcoind emits bare lowercase hex (HexStr), no [size.] prefix
+    // and no brackets.
+    // TODO: bitcoind renders pushes of up to four bytes as signed decimal
+    // (CScriptNum); no standard output script template is affected.
+    if (!data_empty())
+        return encode_base16(get_data());
+
+    // Bare opcode: bitcoind GetOpName mnemonic.
+    return opcode_to_bitcoind(code_, active_flags);
+}
+
 // Properties.
 // ----------------------------------------------------------------------------
 

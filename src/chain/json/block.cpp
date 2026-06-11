@@ -116,7 +116,8 @@ DEFINE_JSON_FROM_TAGGED(bitcoind_verbose_tag, block)
 {
     const auto& block = instance.value;
     value = value_from(bitcoind(block));
-    value.as_object()["tx"] = value_from(bitcoind(*block.transactions_ptr()));
+    value.as_object()["tx"] = value_from(
+        bitcoind(*block.transactions_ptr(), instance.context));
 }
 
 } // namespace chain

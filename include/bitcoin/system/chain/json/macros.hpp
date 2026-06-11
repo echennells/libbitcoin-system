@@ -19,6 +19,8 @@
 #ifndef LIBBITCOIN_SYSTEM_CHAIN_JSON_MACROS_HPP
 #define LIBBITCOIN_SYSTEM_CHAIN_JSON_MACROS_HPP
 
+#include <string_view>
+#include <bitcoin/system/chain/enums/selection.hpp>
 #include <bitcoin/system/define.hpp>
 
 namespace libbitcoin {
@@ -31,13 +33,40 @@ struct bitcoind_verbose_tag {};
 struct bitcoind_embedded_tag {};
 struct electrumx_tag {};
 
+/// Address encoding parameters for bitcoind display serialization.
+/// Defaults are mainnet (base58 version bytes and bech32 prefix).
+struct address_context
+{
+    uint8_t p2kh_prefix{ 0x00 };
+    uint8_t p2sh_prefix{ 0x05 };
+    std::string_view hrp{ "bc" };
+};
+
+/// Network selection to address context.
+/// TODO: add signet when its selection enumeration exists.
+constexpr address_context to_address_context(
+    system::chain::selection network) NOEXCEPT
+{
+    switch (network)
+    {
+        case system::chain::selection::testnet3:
+            return { 0x6f, 0xc4, "tb" };
+        case system::chain::selection::regtest:
+            return { 0x6f, 0xc4, "bcrt" };
+        default:
+            return {};
+    }
+}
+
 /// Reference wrapper.
 template<class Tag, class Type>
 struct wrapped
 {
     const Type& value;
-    explicit wrapped(const Type& value) NOEXCEPT
-      : value(value)
+    address_context context;
+    explicit wrapped(const Type& value,
+        const address_context& context={}) NOEXCEPT
+      : value(value), context(context)
     {
     }
 };
@@ -49,9 +78,10 @@ inline auto native(const Type& value) NOEXCEPT
     return wrapped<native_tag, Type>{ value };
 }
 template<class Type>
-inline auto bitcoind(const Type& value) NOEXCEPT
+inline auto bitcoind(const Type& value,
+    const address_context& context={}) NOEXCEPT
 {
-    return wrapped<bitcoind_tag, Type>{ value };
+    return wrapped<bitcoind_tag, Type>{ value, context };
 }
 template<class Type>
 inline auto bitcoind_hashed(const Type& value) NOEXCEPT
@@ -59,9 +89,10 @@ inline auto bitcoind_hashed(const Type& value) NOEXCEPT
     return wrapped<bitcoind_hashed_tag, Type>{ value };
 }
 template<class Type>
-inline auto bitcoind_verbose(const Type& value) NOEXCEPT
+inline auto bitcoind_verbose(const Type& value,
+    const address_context& context={}) NOEXCEPT
 {
-    return wrapped<bitcoind_verbose_tag, Type>{ value };
+    return wrapped<bitcoind_verbose_tag, Type>{ value, context };
 }
 template<class Type>
 inline auto bitcoind_embedded(const Type& value) NOEXCEPT

@@ -241,6 +241,21 @@ BOOST_AUTO_TEST_CASE(script__pattern__20_of_21_multisig__non_standard)
     BOOST_REQUIRE(instance.pattern() == chain::script_pattern::non_standard);
 }
 
+// pay_witness_v1_taproot
+
+// A v1 (taproot) witness program is OP_1 (push_positive_1) followed by a
+// 32 byte push, not push_size_1 (a one byte data push).
+static const std::string script_taproot_output = "1 [79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798]";
+
+BOOST_AUTO_TEST_CASE(script__pattern__taproot_output__pay_witness_v1_taproot)
+{
+    const script instance(script_taproot_output);
+    BOOST_REQUIRE(instance.is_valid());
+    BOOST_REQUIRE(instance.output_pattern() == chain::script_pattern::pay_witness_v1_taproot);
+    BOOST_REQUIRE(instance.input_pattern() == chain::script_pattern::sign_script_hash);
+    BOOST_REQUIRE(instance.pattern() == chain::script_pattern::pay_witness_v1_taproot);
+}
+
 // is_pay_tapscript_threshold_pattern
 
 BOOST_AUTO_TEST_CASE(script__is_pay_tapscript_threshold_pattern__match_1_of_1__true)

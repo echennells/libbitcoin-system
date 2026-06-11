@@ -682,6 +682,158 @@ std::string opcode_to_hexadecimal(opcode code) NOEXCEPT
     return "0x" + encode_base16({ static_cast<uint8_t>(code) });
 }
 
+// Mirror of bitcoind GetOpName() (src/script/script.cpp). Fork-independent:
+// bitcoind returns full mnemonics for CLTV/CSV/CHECKSIGADD and the
+// (historically disabled) opcodes regardless of consensus flags, so
+// active_forks is unused.
+std::string opcode_to_bitcoind(opcode value, uint32_t) NOEXCEPT
+{
+    constexpr auto op_zero = static_cast<uint8_t>(opcode::reserved_80);
+
+    switch (value)
+    {
+        // push value (bitcoind emits bare numbers for small-int opcodes).
+        case opcode::push_size_0:       return "0";       // OP_0
+        case opcode::push_one_size:     return "OP_PUSHDATA1";
+        case opcode::push_two_size:     return "OP_PUSHDATA2";
+        case opcode::push_four_size:    return "OP_PUSHDATA4";
+        case opcode::push_negative_1:   return "-1";      // OP_1NEGATE
+        case opcode::reserved_80:       return "OP_RESERVED";
+        case opcode::push_positive_1:
+        case opcode::push_positive_2:
+        case opcode::push_positive_3:
+        case opcode::push_positive_4:
+        case opcode::push_positive_5:
+        case opcode::push_positive_6:
+        case opcode::push_positive_7:
+        case opcode::push_positive_8:
+        case opcode::push_positive_9:
+        case opcode::push_positive_10:
+        case opcode::push_positive_11:
+        case opcode::push_positive_12:
+        case opcode::push_positive_13:
+        case opcode::push_positive_14:
+        case opcode::push_positive_15:
+        case opcode::push_positive_16:  // OP_1..OP_16 -> bare "1".."16".
+            return serialize(static_cast<uint8_t>(value) - op_zero);
+
+        // control.
+        case opcode::nop:               return "OP_NOP";
+        case opcode::op_ver:            return "OP_VER";
+        case opcode::if_:               return "OP_IF";
+        case opcode::notif:             return "OP_NOTIF";
+        case opcode::op_verif:          return "OP_VERIF";
+        case opcode::op_vernotif:       return "OP_VERNOTIF";
+        case opcode::else_:             return "OP_ELSE";
+        case opcode::endif:             return "OP_ENDIF";
+        case opcode::verify:            return "OP_VERIFY";
+        case opcode::op_return:         return "OP_RETURN";
+
+        // stack ops.
+        case opcode::toaltstack:        return "OP_TOALTSTACK";
+        case opcode::fromaltstack:      return "OP_FROMALTSTACK";
+        case opcode::drop2:             return "OP_2DROP";
+        case opcode::dup2:              return "OP_2DUP";
+        case opcode::dup3:              return "OP_3DUP";
+        case opcode::over2:             return "OP_2OVER";
+        case opcode::rot2:              return "OP_2ROT";
+        case opcode::swap2:             return "OP_2SWAP";
+        case opcode::ifdup:             return "OP_IFDUP";
+        case opcode::depth:             return "OP_DEPTH";
+        case opcode::drop:              return "OP_DROP";
+        case opcode::dup:               return "OP_DUP";
+        case opcode::nip:               return "OP_NIP";
+        case opcode::over:              return "OP_OVER";
+        case opcode::pick:              return "OP_PICK";
+        case opcode::roll:              return "OP_ROLL";
+        case opcode::rot:               return "OP_ROT";
+        case opcode::swap:              return "OP_SWAP";
+        case opcode::tuck:              return "OP_TUCK";
+
+        // splice ops (disabled, but bitcoind still names them).
+        case opcode::op_cat:            return "OP_CAT";
+        case opcode::op_substr:         return "OP_SUBSTR";
+        case opcode::op_left:           return "OP_LEFT";
+        case opcode::op_right:          return "OP_RIGHT";
+        case opcode::size:              return "OP_SIZE";
+
+        // bit logic.
+        case opcode::op_invert:         return "OP_INVERT";
+        case opcode::op_and:            return "OP_AND";
+        case opcode::op_or:             return "OP_OR";
+        case opcode::op_xor:            return "OP_XOR";
+        case opcode::equal:             return "OP_EQUAL";
+        case opcode::equalverify:       return "OP_EQUALVERIFY";
+        case opcode::reserved_137:      return "OP_RESERVED1";
+        case opcode::reserved_138:      return "OP_RESERVED2";
+
+        // numeric.
+        case opcode::add1:              return "OP_1ADD";
+        case opcode::sub1:              return "OP_1SUB";
+        case opcode::op_mul2:           return "OP_2MUL";
+        case opcode::op_div2:           return "OP_2DIV";
+        case opcode::negate:            return "OP_NEGATE";
+        case opcode::abs:               return "OP_ABS";
+        case opcode::not_:              return "OP_NOT";
+        case opcode::nonzero:           return "OP_0NOTEQUAL";
+        case opcode::add:               return "OP_ADD";
+        case opcode::sub:               return "OP_SUB";
+        case opcode::op_mul:            return "OP_MUL";
+        case opcode::op_div:            return "OP_DIV";
+        case opcode::op_mod:            return "OP_MOD";
+        case opcode::op_lshift:         return "OP_LSHIFT";
+        case opcode::op_rshift:         return "OP_RSHIFT";
+        case opcode::booland:           return "OP_BOOLAND";
+        case opcode::boolor:            return "OP_BOOLOR";
+        case opcode::numequal:          return "OP_NUMEQUAL";
+        case opcode::numequalverify:    return "OP_NUMEQUALVERIFY";
+        case opcode::numnotequal:       return "OP_NUMNOTEQUAL";
+        case opcode::lessthan:          return "OP_LESSTHAN";
+        case opcode::greaterthan:       return "OP_GREATERTHAN";
+        case opcode::lessthanorequal:   return "OP_LESSTHANOREQUAL";
+        case opcode::greaterthanorequal:return "OP_GREATERTHANOREQUAL";
+        case opcode::min:               return "OP_MIN";
+        case opcode::max:               return "OP_MAX";
+        case opcode::within:            return "OP_WITHIN";
+
+        // crypto.
+        case opcode::ripemd160:         return "OP_RIPEMD160";
+        case opcode::sha1:              return "OP_SHA1";
+        case opcode::sha256:            return "OP_SHA256";
+        case opcode::hash160:           return "OP_HASH160";
+        case opcode::hash256:           return "OP_HASH256";
+        case opcode::codeseparator:     return "OP_CODESEPARATOR";
+        case opcode::checksig:          return "OP_CHECKSIG";
+        case opcode::checksigverify:    return "OP_CHECKSIGVERIFY";
+        case opcode::checkmultisig:     return "OP_CHECKMULTISIG";
+        case opcode::checkmultisigverify:return "OP_CHECKMULTISIGVERIFY";
+
+        // expansion. nop2/nop3 are enum aliases for CLTV/CSV; GetOpName is
+        // fork-independent so these always return the full mnemonic.
+        case opcode::nop1:              return "OP_NOP1";
+        case opcode::checklocktimeverify: return "OP_CHECKLOCKTIMEVERIFY";
+        case opcode::checksequenceverify: return "OP_CHECKSEQUENCEVERIFY";
+        case opcode::nop4:              return "OP_NOP4";
+        case opcode::nop5:              return "OP_NOP5";
+        case opcode::nop6:              return "OP_NOP6";
+        case opcode::nop7:              return "OP_NOP7";
+        case opcode::nop8:              return "OP_NOP8";
+        case opcode::nop9:              return "OP_NOP9";
+        case opcode::nop10:             return "OP_NOP10";
+
+        // Opcode added by bip342 (Tapscript). reserved_186 == checksigadd.
+        case opcode::reserved_186:      return "OP_CHECKSIGADD";
+
+        // bitcoind has an explicit 0xff case (script.cpp).
+        case opcode::reserved_255:      return "OP_INVALIDOPCODE";
+
+        // GetOpName has no case for raw data-push bytes (0x01-0x4b) or for
+        // reserved_187..reserved_254, so its switch falls through to the
+        // single literal "OP_UNKNOWN" (not the hex byte).
+        default:                        return "OP_UNKNOWN";
+    }
+}
+
 bool opcode_from_hexadecimal(opcode& out_code,
     const std::string_view& value) NOEXCEPT
 {

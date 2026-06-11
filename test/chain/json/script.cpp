@@ -49,4 +49,36 @@ BOOST_AUTO_TEST_CASE(script__json__conversions__expected)
     BOOST_REQUIRE(json::value_to<script>(value) == instance);
 }
 
+// The bitcoind tag emits uppercase OP_ asm tokens with bare push-data hex
+// (native emits lowercase mnemonics and bracketed pushes).
+BOOST_AUTO_TEST_CASE(script__bitcoind__pay_key_hash__expected_asm)
+{
+    const script instance{
+        base16_chunk("76a914536ffa992491508dca0354e52f32a3a7a679a53a88ac"),
+        false };
+    const auto value = json::value_from(bitcoind(instance));
+    const auto& object = value.as_object();
+    BOOST_REQUIRE_EQUAL(object.at("asm").as_string(),
+        "OP_DUP OP_HASH160 536ffa992491508dca0354e52f32a3a7a679a53a"
+        " OP_EQUALVERIFY OP_CHECKSIG");
+    BOOST_REQUIRE_EQUAL(object.at("hex").as_string(),
+        "76a914536ffa992491508dca0354e52f32a3a7a679a53a88ac");
+}
+
+// OP_0 renders as '0' (native 'zero'); OP_RETURN as 'OP_RETURN' (native
+// 'return'); push data as bare hex.
+BOOST_AUTO_TEST_CASE(script__bitcoind__small_opcodes__expected_tokens)
+{
+    const script witness_key_hash{
+        base16_chunk("0014751e76e8199196d454941c45d1b3a323f1433bd6"), false };
+    const auto witness_value = json::value_from(bitcoind(witness_key_hash));
+    BOOST_REQUIRE_EQUAL(witness_value.as_object().at("asm").as_string(),
+        "0 751e76e8199196d454941c45d1b3a323f1433bd6");
+
+    const script null_data{ base16_chunk("6a04deadbeef"), false };
+    const auto null_data_value = json::value_from(bitcoind(null_data));
+    BOOST_REQUIRE_EQUAL(null_data_value.as_object().at("asm").as_string(),
+        "OP_RETURN deadbeef");
+}
+
 BOOST_AUTO_TEST_SUITE_END()
