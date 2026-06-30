@@ -189,6 +189,28 @@ size_t transaction_view::serialized_size(bool witness) const NOEXCEPT
     return witness && is_segregated() ? size_ : stripped_size();
 }
 
+void transaction_view::to_data(writer& sink, bool witness) const NOEXCEPT
+{
+    // Witness can be stripped but never added (mirrors chain::transaction).
+    if (witness && is_segregated())
+    {
+        sink.write_bytes({ tx_ptr_, std::next(tx_ptr_, size_) });
+        return;
+    }
+
+    // Stripped form drops the witness marker/flag sentinels (after version)
+    // and the witness data (before locktime); inputs/outputs are unchanged.
+    const auto sentinels = is_zero(witnesses_size_) ? zero : sentinels_size;
+    const auto body = std::next(tx_ptr_, version_size + sentinels);
+    const auto body_end = std::next(tx_ptr_, size_ - witnesses_size_ -
+        locktime_size);
+
+    sink.write_bytes({ tx_ptr_, std::next(tx_ptr_, version_size) });
+    sink.write_bytes({ body, body_end });
+    sink.write_bytes({ std::next(tx_ptr_, size_ - locktime_size),
+        std::next(tx_ptr_, size_) });
+}
+
 const hash_digest& transaction_view::hash(bool witness) const NOEXCEPT
 {
     return witness && is_segregated() ? wtxid_ : txid_;
