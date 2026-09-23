@@ -125,6 +125,26 @@ BOOST_AUTO_TEST_CASE(cast__to_integer__fractional_whole__false)
     BOOST_REQUIRE(!to_integer(value, 42.0001, true));
 }
 
+BOOST_AUTO_TEST_CASE(cast__to_integer__rounded_maximum__false)
+{
+    uint32_t unsigned32{};
+    uint64_t unsigned64{};
+    int64_t signed64{};
+    BOOST_REQUIRE(!to_integer(unsigned32, 4294967296.0));  // 2^32
+    BOOST_REQUIRE(!to_integer(unsigned64, 18446744073709551616.0));  // 2^64
+    BOOST_REQUIRE(!to_integer(signed64, 9223372036854775808.0));  // 2^63
+}
+
+BOOST_AUTO_TEST_CASE(cast__to_integer__representable_maximum__true)
+{
+    uint32_t unsigned32{};
+    uint64_t unsigned64{};
+    BOOST_REQUIRE(to_integer(unsigned32, 4294967295.0));
+    BOOST_REQUIRE_EQUAL(unsigned32, max_uint32);
+    BOOST_REQUIRE(to_integer(unsigned64, 18446744073709549568.0));  // 2^64 - 2^11
+    BOOST_REQUIRE_EQUAL(unsigned64, 18446744073709549568u);
+}
+
 // to_ceilinged_integer
 
 BOOST_AUTO_TEST_CASE(cast__to_ceilinged_integer__non_finites__max)
@@ -236,6 +256,13 @@ BOOST_AUTO_TEST_CASE(cast__to_truncated_integer__overflow_underflow__clamped)
     BOOST_REQUIRE_EQUAL(to_truncated_integer<size_t>(-limit<double>::max()), min_size_t);
     BOOST_REQUIRE_EQUAL(to_truncated_integer<signed_size_t>(limit<double>::max()), max_signed_size_t);
     BOOST_REQUIRE_EQUAL(to_truncated_integer<signed_size_t>(-limit<double>::max()), min_signed_size_t);
+}
+
+BOOST_AUTO_TEST_CASE(cast__to_truncated_integer__rounded_maximum__clamped)
+{
+    BOOST_REQUIRE_EQUAL(to_truncated_integer<uint32_t>(4294967296.0), max_uint32);
+    BOOST_REQUIRE_EQUAL(to_truncated_integer<size_t>(18446744073709551616.0), max_size_t);
+    BOOST_REQUIRE_EQUAL(to_truncated_integer<signed_size_t>(9223372036854775808.0), max_signed_size_t);
 }
 
 BOOST_AUTO_TEST_CASE(cast__to_truncated_integer__finites__expected)
