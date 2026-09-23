@@ -227,7 +227,11 @@ inline bool to_integer(Integer& out, Float value, bool whole) NOEXCEPT
     if (whole && (std::fabs(value - integer) > tolerance))
         return false;
 
-    if (integer > static_cast<Float>(std::numeric_limits<Integer>::max()) ||
+    // Maximum may round up to 2^digits, the exact least out of range value.
+    const auto bound = std::ldexp(Float{ 1.0 },
+        std::numeric_limits<Integer>::digits);
+
+    if (integer >= bound ||
         integer < static_cast<Float>(std::numeric_limits<Integer>::min()))
         return false;
 
@@ -268,7 +272,12 @@ inline Integer to_truncated_integer(Float value) NOEXCEPT
         return std::numeric_limits<Integer>::max();
 
     const auto integer = std::trunc(value);
-    if (integer > static_cast<Float>(std::numeric_limits<Integer>::max()))
+
+    // Maximum may round up to 2^digits, the exact least out of range value.
+    const auto bound = std::ldexp(Float{ 1.0 },
+        std::numeric_limits<Integer>::digits);
+
+    if (integer >= bound)
         return std::numeric_limits<Integer>::max();
 
     if (integer < static_cast<Float>(std::numeric_limits<Integer>::min()))
