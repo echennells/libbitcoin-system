@@ -30,6 +30,7 @@ Requires: \
 
 Cflags: \
     -I${includedir} \
+    @ultrafast@ \
     @avx2@ \
     @avx512@ \
     @shani@ \

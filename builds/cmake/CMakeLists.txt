@@ -322,6 +322,11 @@ target_compile_options( libbitcoin-system
     $<$<COMPILE_LANGUAGE:CXX>:-fstack-protector-all>
 )
 
+target_compile_definitions( libbitcoin-system
+  PUBLIC
+    $<$<BOOL:${with-ultrafast}>:WITH_ULTRAFAST>
+)
+
 file( GLOB_RECURSE libbitcoin_system_HEADERS CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/../../include/*.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/../../include/*.hpp"
