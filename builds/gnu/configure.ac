@@ -227,6 +227,13 @@ AC_ARG_WITH([secp256k1],
 AC_MSG_RESULT([$with_secp256k1])
 AM_CONDITIONAL([WITH_SECP256K1], [test "x${with_secp256k1}" != "xno"])
 
+# Set preprocessor defines.
+#==============================================================================
+AS_IF([test "x${with_ultrafast}" != "xno"], [
+        AC_DEFINE([WITH_ULTRAFAST])
+        AC_SUBST([ultrafast], [-DWITH_ULTRAFAST])
+    ])
+
 # Set flags.
 #==============================================================================
 AS_IF([test "x${enable_avx2}" != "xno"],
@@ -502,12 +509,12 @@ AS_IF([test "x${with_ultrafast}" != "xno"],
   [
     PKG_CHECK_MODULES(
       [UltrafastSecp256k1],
-      [secp256k1-fast >= 4.0.0.0],
+      [secp256k1-fast-libbitcoin >= 4.0.0.0],
       [],
       [
-        AC_MSG_ERROR([secp256k1-fast >= 4.0.0.0 is required but was not found.])
+        AC_MSG_ERROR([secp256k1-fast-libbitcoin >= 4.0.0.0 is required but was not found.])
       ])
-    AC_SUBST([UltrafastSecp256k1_PKG], ['secp256k1-fast >= 4.0.0.0'])
+    AC_SUBST([UltrafastSecp256k1_PKG], ['secp256k1-fast-libbitcoin >= 4.0.0.0'])
     AC_SUBST([UltrafastSecp256k1_CPPFLAGS], [${UltrafastSecp256k1_CFLAGS}])
     AC_SUBST([UltrafastSecp256k1_ISYS_CPPFLAGS], [`echo ${UltrafastSecp256k1_CPPFLAGS} | ${SED} s/^-I/-isystem/g | ${SED} s/' -I'/' -isystem'/g`])
     AC_MSG_NOTICE([UltrafastSecp256k1_CPPFLAGS : ${UltrafastSecp256k1_CPPFLAGS}])
