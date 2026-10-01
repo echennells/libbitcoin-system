@@ -67,7 +67,10 @@ lookup(const table_t& table, size_t digit) NOEXCEPT
     projective_t out{};
     for (size_t index{}; index < entries; ++index)
     {
-        const auto mask = twos_complement(to_int<uint64_t>(index == digit));
+        // All ones where index is digit, without a compare to branch on.
+        const auto differ = unpredictable(bit_xor(index, digit));
+        const auto either = bit_or(differ, twos_complement(differ));
+        const auto mask = sub1(shift_right(either, sub1(bits<uint64_t>)));
         select(out.x, mask, table[index].x, out.x);
         select(out.y, mask, table[index].y, out.y);
         select(out.z, mask, table[index].z, out.z);

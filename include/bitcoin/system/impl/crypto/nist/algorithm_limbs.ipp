@@ -93,14 +93,44 @@ TEMPLATE
 INLINE constexpr uint64_t CLASS::
 multiply_add(uint64_t t, uint64_t a, uint64_t b, uint64_t& carry) NOEXCEPT
 {
+#if defined(__SIZEOF_INT128__)
+    using wide = unsigned __int128;
+    const auto total = wide{ a } * b + t + carry;
+    carry = static_cast<uint64_t>(total >> bits<uint64_t>);
+    return static_cast<uint64_t>(total);
+#elif defined(HAVE_MSC) && defined(HAVE_X64)
     uint64_t hi{}, lo{};
     mul_wide(hi, lo, a, b);
-    lo += t;
-    hi += to_int<uint64_t>(lo < t);
-    lo += carry;
-    hi += to_int<uint64_t>(lo < carry);
+    hi += static_cast<uint64_t>(system::add_carry(lo, lo, t, false));
+    hi += static_cast<uint64_t>(system::add_carry(lo, lo, carry, false));
     carry = hi;
     return lo;
+#else
+    uint64_t hi{}, lo{};
+    mul_wide(hi, lo, a, b);
+    hi += add_carry(lo, lo, t, 0);
+    hi += add_carry(lo, lo, carry, 0);
+    carry = hi;
+    return lo;
+#endif
+}
+
+// An identity the optimizer cannot see through, so a value derived from a
+// secret is not recovered into a branch or table index. constexpr-transparent.
+TEMPLATE
+INLINE constexpr uint64_t CLASS::
+unpredictable(uint64_t value) NOEXCEPT
+{
+    if (std::is_constant_evaluated())
+        return value;
+
+#if defined(HAVE_GNUC) || defined(HAVE_CLANG)
+    __asm__ volatile("" : "+r"(value));
+    return value;
+#else
+    const volatile uint64_t sink{ value };
+    return sink;
+#endif
 }
 
 // out = mask ? a : b, with mask all ones or all zeros.
@@ -108,6 +138,7 @@ TEMPLATE
 INLINE constexpr void CLASS::
 select(limbs_t& out, uint64_t mask, const limbs_t& a, const limbs_t& b) NOEXCEPT
 {
+    mask = unpredictable(mask);
     for (size_t word{}; word < words; ++word)
     {
         const auto from_a = bit_and(a[word], mask);
