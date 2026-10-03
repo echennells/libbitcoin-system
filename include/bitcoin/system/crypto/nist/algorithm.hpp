@@ -147,6 +147,7 @@ protected:
         uint64_t a, uint64_t b, uint64_t borrow) NOEXCEPT;
     INLINE static constexpr uint64_t multiply_add(uint64_t t, uint64_t a,
         uint64_t b, uint64_t& carry) NOEXCEPT;
+    INLINE static constexpr uint64_t unpredictable(uint64_t value) NOEXCEPT;
 
     INLINE static constexpr void select(limbs_t& out, uint64_t mask,
         const limbs_t& a, const limbs_t& b) NOEXCEPT;
