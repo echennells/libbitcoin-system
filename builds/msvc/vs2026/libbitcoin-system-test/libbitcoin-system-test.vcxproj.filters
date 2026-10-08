@@ -363,6 +363,9 @@
     <ClCompile Include="..\..\..\..\test\crypto\nist.cpp">
       <Filter>src\crypto</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\test\crypto\nist_ctime.cpp">
+      <Filter>src\crypto</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\test\crypto\performance.cpp">
       <Filter>src\crypto</Filter>
     </ClCompile>
