@@ -189,7 +189,9 @@ constexpr bool CLASS::
 to_affine(limbs_t& x, limbs_t& y, const projective_t& p) NOEXCEPT
 {
     constexpr auto m = field();
-    if (is_zero(p.z))
+    const auto infinity = is_zero(p.z);
+    declassify(infinity);
+    if (infinity)
         return false;
 
     const auto z = inverse(p.z, m);

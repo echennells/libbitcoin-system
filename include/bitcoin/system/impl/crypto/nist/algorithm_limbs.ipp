@@ -133,6 +133,17 @@ unpredictable(uint64_t value) NOEXCEPT
 #endif
 }
 
+// Release a value from constant time analysis, as public by definition or of
+// negligible dependence on secrets.
+TEMPLATE
+template <typename Value>
+constexpr void CLASS::
+declassify(const Value& value) NOEXCEPT
+{
+    if (!std::is_constant_evaluated())
+        system::declassify(value);
+}
+
 // out = mask ? a : b, with mask all ones or all zeros.
 TEMPLATE
 INLINE constexpr void CLASS::

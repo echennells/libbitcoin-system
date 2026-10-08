@@ -91,8 +91,10 @@ sign(signature_t& out, const secret_t& secret, const_byte_span digest) NOEXCEPT
             auto total = add(em, multiply(rm, dm, n), n);
             auto sm = multiply(inverse(km, n), total, n);
             const auto s = from_montgomery(sm, n);
-
-            if (!is_zero(r) && !is_zero(s))
+            const auto zero = bit_or(to_int<uint64_t>(is_zero(r)),
+                to_int<uint64_t>(is_zero(s)));
+            declassify(zero);
+            if (bc::is_zero(zero))
             {
                 out = splice(to_bytes(r), to_bytes(s));
                 wipe(d);
@@ -163,7 +165,10 @@ TEMPLATE
 constexpr bool CLASS::
 is_scalar(const limbs_t& value) NOEXCEPT
 {
-    return !is_zero(value) && is_less(value, scalar().value);
+    const auto valid = bit_and(to_int<uint64_t>(!is_zero(value)),
+        to_int<uint64_t>(is_less(value, scalar().value)));
+    declassify(valid);
+    return to_bool(valid);
 }
 
 // A value below 2^(8 * size), which is less than twice the order.
