@@ -222,6 +222,7 @@
     <ClCompile Include="..\..\..\..\test\crypto\fschacha20_poly1305.cpp" />
     <ClCompile Include="..\..\..\..\test\crypto\maybe_random.cpp" />
     <ClCompile Include="..\..\..\..\test\crypto\nist.cpp" />
+    <ClCompile Include="..\..\..\..\test\crypto\nist_ctime.cpp" />
     <ClCompile Include="..\..\..\..\test\crypto\performance.cpp">
       <ObjectFileName>$(IntDir)test_crypto_performance.obj</ObjectFileName>
     </ClCompile>

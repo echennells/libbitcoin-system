@@ -1197,6 +1197,7 @@ test_libbitcoin_system_test_SOURCES = \
     ${srcdir}/../../test/crypto/fschacha20_poly1305.cpp \
     ${srcdir}/../../test/crypto/maybe_random.cpp \
     ${srcdir}/../../test/crypto/nist.cpp \
+    ${srcdir}/../../test/crypto/nist_ctime.cpp \
     ${srcdir}/../../test/crypto/performance.cpp \
     ${srcdir}/../../test/crypto/poly1305.cpp \
     ${srcdir}/../../test/crypto/salsa20.cpp \
