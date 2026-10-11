@@ -55,15 +55,30 @@ constexpr void algorithm::reduce(scalar_t& r, uint64_t overflow) NOEXCEPT
             carry);
 }
 
+// A mask from a secret is otherwise recovered into a branch or table index.
+INLINE constexpr uint64_t algorithm::unpredictable(uint64_t value) NOEXCEPT
+{
+    if (std::is_constant_evaluated())
+        return value;
+
+#if defined(HAVE_GNUC) || defined(HAVE_CLANG)
+    __asm__ volatile("" : "+r"(value));
+    return value;
+#else
+    const volatile uint64_t sink{ value };
+    return sink;
+#endif
+}
+
 constexpr uint64_t algorithm::to_mask(bool value) NOEXCEPT
 {
-    return 0_u64 - to_int<uint64_t>(value);
+    return unpredictable(0_u64 - to_int<uint64_t>(value));
 }
 
 // The high bit of value or its negation is set for any nonzero value.
 constexpr uint64_t algorithm::zero_mask(uint64_t value) NOEXCEPT
 {
-    return sub1((value | (0_u64 - value)) >> sub1(bits<uint64_t>));
+    return unpredictable(sub1((value | (0_u64 - value)) >> sub1(bits<uint64_t>)));
 }
 
 // Folds limbs above 2^256 by 2^256 = 2^256 - n (mod n), from 512 to 385 to

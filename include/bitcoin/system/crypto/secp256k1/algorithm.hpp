@@ -432,6 +432,9 @@ protected:
     static constexpr void reduce(scalar_t& r, uint64_t overflow) NOEXCEPT;
     static constexpr void reduce(scalar_t& r, const wide_t& l) NOEXCEPT;
 
+    /// Identity the optimizer cannot see through, for masks of secret data.
+    INLINE static constexpr uint64_t unpredictable(uint64_t value) NOEXCEPT;
+
     /// All bits set where true.
     static constexpr uint64_t to_mask(bool value) NOEXCEPT;
 
