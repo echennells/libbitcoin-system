@@ -396,7 +396,11 @@ constexpr void algorithm::digit(Word& index, Word& negative,
     {
         const auto& half = halves[lane];
         const auto value = half.digits[position];
-        const size_t magnitude = absolute(value);
+        const auto sign = to_mask(is_negative(value));
+        const auto wide = possible_sign_cast<uint64_t>(
+            possible_wide_cast<int64_t>(value));
+        const auto magnitude = possible_narrow_cast<size_t>(
+            bit_xor(wide, sign) - sign);
         const auto entry = to_half(sub1(magnitude));
         indexes[lane] = interleaved ? entry * stride + lane : entry;
         negatives[lane] = to_mask(is_negative(value) != half.negative);
@@ -481,7 +485,10 @@ constexpr void algorithm::lookup(affine_t<Word>& r,
         for (size_t at{}; at < Size; ++at)
         {
             const auto first = f::broadcast<Word>(uint64_t{ at * stride });
-            const auto mask = f::eq<64>(offset, f::add<64>(first, ids));
+            auto mask = f::eq<64>(offset, f::add<64>(first, ids));
+            if constexpr (is_same_type<Word, uint64_t>)
+                mask = unpredictable(mask);
+
             const auto& x = table[at].x;
             const auto& y = table[at].y;
             for (size_t limb{}; limb < size; ++limb)
