@@ -216,6 +216,7 @@ public:
     using iterator = operations::const_iterator;
 
     /// Public mutable metadata access, not copied or compared for equality.
+    /// Affects serialization, so set only during program evaluation.
     mutable iterator offset;
 };
 

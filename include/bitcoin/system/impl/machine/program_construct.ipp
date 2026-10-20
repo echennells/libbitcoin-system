@@ -133,6 +133,18 @@ CLASS::program(const transaction& tx, const input_iterator& input,
     script_->clear_offset();
 }
 
+// Destructor.
+// ----------------------------------------------------------------------------
+
+// The input script and prevout script are serialized after evaluation (a
+// prevout may also be a block output), so the offset set by op_codeseparator
+// must not outlive the program.
+TEMPLATE
+CLASS::~program() NOEXCEPT
+{
+    script_->clear_offset();
+}
+
 } // namespace machine
 } // namespace system
 } // namespace libbitcoin

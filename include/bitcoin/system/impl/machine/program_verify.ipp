@@ -120,7 +120,8 @@ decode_signature(ec_signature& out, const data_slice& der_signature,
 
 // Subscripts are referenced by script.offset mutable metadata. This allows for
 // efficient subscripting with no copying. As a result concurrent execution of
-// any one input script instance is not thread safe.
+// any one input script instance is not thread safe. The offset affects script
+// serialization, so it is cleared on program construction and destruction.
 TEMPLATE
 INLINE void CLASS::
 set_subscript(const op_iterator& op) NOEXCEPT
