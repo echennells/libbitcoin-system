@@ -2854,6 +2854,179 @@ BOOST_AUTO_TEST_CASE(transaction__connect__roller_input_script__script_success)
     BOOST_REQUIRE_EQUAL(instance.connect(ctx), error::transaction_success);
 }
 
+// An executed op_codeseparator does not change the serialization of a script.
+
+static transaction separator_spend(const script& prevout_script) NOEXCEPT
+{
+    const chain::inputs ins{ input{ point{ one_hash, 0 }, script{}, max_input_sequence } };
+    const chain::outputs outs{ output{ 0, script{} } };
+    const transaction out{ 1, ins, outs, 0 };
+    out.inputs_ptr()->front()->prevout = to_shared<output>(0, prevout_script);
+    return out;
+}
+
+BOOST_AUTO_TEST_CASE(transaction__connect__executed_codeseparator_prevout__prevout_script_unchanged)
+{
+    const context ctx{ flags::no_rules, 0, 0, 0, 0, 0, 0 };
+    const auto instance = separator_spend({ base16_chunk("ab51"), false });
+    BOOST_REQUIRE_EQUAL(instance.connect(ctx), error::transaction_success);
+    BOOST_REQUIRE_EQUAL(instance.inputs_ptr()->front()->prevout->script().to_data(false), base16_chunk("ab51"));
+}
+
+BOOST_AUTO_TEST_CASE(transaction__connect__executed_last_codeseparator_prevout__prevout_script_unchanged)
+{
+    const context ctx{ flags::no_rules, 0, 0, 0, 0, 0, 0 };
+    const auto instance = separator_spend({ base16_chunk("51ab"), false });
+    BOOST_REQUIRE_EQUAL(instance.connect(ctx), error::transaction_success);
+    BOOST_REQUIRE_EQUAL(instance.inputs_ptr()->front()->prevout->script().to_data(false), base16_chunk("51ab"));
+}
+
+BOOST_AUTO_TEST_CASE(transaction__connect__unexecuted_codeseparator_prevout__prevout_script_unchanged)
+{
+    const context ctx{ flags::no_rules, 0, 0, 0, 0, 0, 0 };
+    const auto instance = separator_spend({ base16_chunk("0063ab6851"), false });
+    BOOST_REQUIRE_EQUAL(instance.connect(ctx), error::transaction_success);
+    BOOST_REQUIRE_EQUAL(instance.inputs_ptr()->front()->prevout->script().to_data(false), base16_chunk("0063ab6851"));
+}
+
+BOOST_AUTO_TEST_CASE(transaction__connect__executed_codeseparator_input_script__serialization_unchanged)
+{
+    const context ctx{ flags::no_rules, 0, 0, 0, 0, 0, 0 };
+    const chain::inputs ins{ input{ point{ one_hash, 0 }, { base16_chunk("51ab"), false }, max_input_sequence } };
+    const chain::outputs outs{ output{ 0, script{} } };
+    const transaction instance{ 1, ins, outs, 0 };
+    instance.inputs_ptr()->front()->prevout = to_shared<output>(0, script{});
+    const auto expected = instance.to_data(true);
+    BOOST_REQUIRE_EQUAL(instance.connect(ctx), error::transaction_success);
+    BOOST_REQUIRE_EQUAL(instance.to_data(true), expected);
+}
+
+// The taproot signature hash commits to every prevout script [bip341].
+
+static chain::inputs separator_and_key_path_inputs(const chunk_cptrs& stack,
+    bool key_path_first) NOEXCEPT
+{
+    const input separated{ point{ one_hash, 0 }, script{}, max_input_sequence };
+    const input key_path{ point{ one_hash, 1 }, script{}, witness{ stack }, max_input_sequence };
+    return key_path_first ? chain::inputs{ key_path, separated } : chain::inputs{ separated, key_path };
+}
+
+static void separator_and_key_path_prevouts(const transaction& tx,
+    const ec_xonly& key, bool key_path_first) NOEXCEPT
+{
+    const script separated{ base16_chunk("ab51"), false };
+    const script key_path{ script::to_pay_witness_taproot_pattern(key) };
+    const auto& ins = *tx.inputs_ptr();
+    ins.at(key_path_first ? 1 : 0)->prevout = to_shared<output>(0, separated);
+    ins.at(key_path_first ? 0 : 1)->prevout = to_shared<output>(0, key_path);
+}
+
+static code connect_separator_and_key_path(bool key_path_first,
+    bool truncated=false)
+{
+    const auto secret = base16_hash("b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef");
+    ec_compressed compressed{};
+    BOOST_REQUIRE(secret_to_public(compressed, secret));
+    const auto key = unsafe_array_cast<uint8_t, ec_xonly_size>(std::next(compressed.data()));
+    const chain::outputs outs{ output{ 0, script{} } };
+    const uint32_t index = key_path_first ? 0u : 1u;
+
+    // The signature hash does not cover the witness, and is taken from a
+    // separate instance so that its signature hash cache is not shared.
+    const transaction unsigned_tx{ 1, separator_and_key_path_inputs({}, key_path_first), outs, 0 };
+    separator_and_key_path_prevouts(unsigned_tx, key, key_path_first);
+
+    // A truncated signature hash commits to the separated output script from
+    // the op following its op_codeseparator, which is not valid [bip341].
+    const auto& separated = unsigned_tx.inputs_ptr()->at(key_path_first ? 1 : 0)->prevout->script();
+    if (truncated)
+        separated.offset = std::next(separated.ops().begin());
+
+    hash_digest sighash{};
+    BOOST_REQUIRE(unsigned_tx.signature_hash(sighash, unsigned_tx.input_at(index), {}, 0, {}, script_version::taproot, coverage::hash_default, bip341_flags));
+    separated.clear_offset();
+
+    ec_signature signature{};
+    BOOST_REQUIRE(schnorr::sign(signature, secret, sighash, one_hash));
+    const chunk_cptrs stack{ to_shared<data_chunk>(data_chunk{ signature.cbegin(), signature.cend() }) };
+    const transaction instance{ 1, separator_and_key_path_inputs(stack, key_path_first), outs, 0 };
+    separator_and_key_path_prevouts(instance, key, key_path_first);
+
+    const context ctx{ bip341_flags, 0, 0, 0, 0, 0, 0 };
+    return instance.connect(ctx);
+}
+
+BOOST_AUTO_TEST_CASE(transaction__connect__executed_codeseparator_before_key_path__transaction_success)
+{
+    BOOST_REQUIRE_EQUAL(connect_separator_and_key_path(false), error::transaction_success);
+}
+
+BOOST_AUTO_TEST_CASE(transaction__connect__executed_codeseparator_before_key_path_truncated_signature_hash__op_check_sig_schnorr3)
+{
+    BOOST_REQUIRE_EQUAL(connect_separator_and_key_path(false, true), error::op_check_sig_schnorr3);
+}
+
+BOOST_AUTO_TEST_CASE(transaction__connect__executed_codeseparator_after_key_path__transaction_success)
+{
+    BOOST_REQUIRE_EQUAL(connect_separator_and_key_path(true), error::transaction_success);
+}
+
+// The signature hash subscript follows the last executed op_codeseparator.
+
+static script separator_checksig_script(const ec_compressed& compressed,
+    bool separated) NOEXCEPT
+{
+    const data_chunk key{ compressed.begin(), compressed.end() };
+    return separated ?
+        script{ operations{ { opcode::codeseparator }, { key, false }, { opcode::checksig } } } :
+        script{ operations{ { key, false }, { opcode::checksig } } };
+}
+
+BOOST_AUTO_TEST_CASE(transaction__connect__checksig_after_executed_codeseparator__transaction_success)
+{
+    const auto secret = base16_array("eadc78165ff1f8ea94ad7cfdc54990738a4c53f6e0507b42154201b8e5dff3b1");
+    ec_compressed compressed{};
+    BOOST_REQUIRE(secret_to_public(compressed, secret));
+    const auto subscript = separator_checksig_script(compressed, false);
+    const chain::outputs outs{ output{ 0, script{} } };
+
+    const chain::inputs unsigned_ins{ input{ point{ one_hash, 0 }, script{}, max_input_sequence } };
+    const transaction unsigned_tx{ 1, unsigned_ins, outs, 0 };
+    endorsement endorsed{};
+    BOOST_REQUIRE(unsigned_tx.create_endorsement(endorsed, secret, subscript, 0, 0, coverage::hash_all, script_version::unversioned, flags::bip16_rule));
+
+    const chain::inputs ins{ input{ point{ one_hash, 0 }, script{ operations{ { endorsed, false } } }, max_input_sequence } };
+    const transaction instance{ 1, ins, outs, 0 };
+    instance.inputs_ptr()->front()->prevout = to_shared<output>(0, separator_checksig_script(compressed, true));
+
+    const context ctx{ flags::bip16_rule, 0, 0, 0, 0, 0, 0 };
+    BOOST_REQUIRE_EQUAL(instance.connect(ctx), error::transaction_success);
+}
+
+BOOST_AUTO_TEST_CASE(transaction__connect__witness_checksig_after_executed_codeseparator__transaction_success)
+{
+    const auto secret = base16_array("eadc78165ff1f8ea94ad7cfdc54990738a4c53f6e0507b42154201b8e5dff3b1");
+    ec_compressed compressed{};
+    BOOST_REQUIRE(secret_to_public(compressed, secret));
+    const auto subscript = separator_checksig_script(compressed, false);
+    const auto program = separator_checksig_script(compressed, true).to_data(false);
+    const script prevout_script{ script::to_pay_witness_script_hash_pattern(sha256_hash(program)) };
+    const chain::outputs outs{ output{ 0, script{} } };
+
+    const chain::inputs unsigned_ins{ input{ point{ one_hash, 0 }, script{}, max_input_sequence } };
+    const transaction unsigned_tx{ 1, unsigned_ins, outs, 0 };
+    endorsement endorsed{};
+    BOOST_REQUIRE(unsigned_tx.create_endorsement(endorsed, secret, subscript, 0, 42, coverage::hash_all, script_version::segwit, bip143_flags));
+
+    const chunk_cptrs stack{ to_shared<data_chunk>(endorsed), to_shared<data_chunk>(program) };
+    const chain::inputs ins{ input{ point{ one_hash, 0 }, script{}, witness{ stack }, max_input_sequence } };
+    const transaction instance{ 1, ins, outs, 0 };
+    instance.inputs_ptr()->front()->prevout = to_shared<output>(42, prevout_script);
+
+    const context ctx{ bip143_flags, 0, 0, 0, 0, 0, 0 };
+    BOOST_REQUIRE_EQUAL(instance.connect(ctx), error::transaction_success);
+}
+
 // version1 signature hash [bip341]
 
 static transaction taproot_tx(const chunk_cptrs& stack) NOEXCEPT

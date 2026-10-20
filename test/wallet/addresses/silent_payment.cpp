@@ -759,6 +759,51 @@ BOOST_AUTO_TEST_CASE(silent_payment__summarize__future_segwit_prevout__false)
     BOOST_REQUIRE(!silent_payment::summarize(out, tx));
 }
 
+// A connected key hash input script that executed an op_codeseparator retains
+// its key. Summary from the bip352 reference (key and outpoint of the first
+// "Simple send: two inputs" input, without the second).
+constexpr auto connected_key_hash_summary = "02b04034f00da0678507d1345b7d56fecef825a1151f9dc7d8ca6946452a9e1f43";
+
+static transaction connected_key_hash_spend(bool separated)
+{
+    const auto secret = base16_array("eadc78165ff1f8ea94ad7cfdc54990738a4c53f6e0507b42154201b8e5dff3b1");
+    ec_compressed compressed{};
+    BOOST_REQUIRE(secret_to_public(compressed, secret));
+    const data_chunk key{ compressed.begin(), compressed.end() };
+    const script prevout_script{ script::to_pay_key_hash_pattern(bitcoin_short_hash(compressed)) };
+    const point previous{ digest("f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16"), 0u };
+    const outputs outs{ to_pay_witness_taproot_output(taproot_key) };
+
+    const transaction unsigned_tx{ 2u, inputs{ input{ previous, script{}, max_uint32 } }, outs, 0u };
+    endorsement endorsed{};
+    BOOST_REQUIRE(unsigned_tx.create_endorsement(endorsed, secret, prevout_script, 0u, 0u, coverage::hash_all, script_version::unversioned, flags::bip16_rule));
+
+    operations ops{ { endorsed, false }, { key, false } };
+    if (separated)
+        ops.emplace_back(opcode::codeseparator);
+
+    const transaction tx{ 2u, inputs{ input{ previous, script{ std::move(ops) }, max_uint32 } }, outs, 0u };
+    tx.inputs_ptr()->front()->prevout = to_shared<output>(0u, prevout_script);
+
+    const context ctx{ flags::bip16_rule, 0, 0, 0, 0, 0, 0 };
+    BOOST_REQUIRE_EQUAL(tx.connect(ctx), error::transaction_success);
+    return tx;
+}
+
+BOOST_AUTO_TEST_CASE(silent_payment__summarize__connected_key_hash_codeseparator__expected)
+{
+    ec_compressed out{};
+    BOOST_REQUIRE(silent_payment::summarize(out, connected_key_hash_spend(true)));
+    BOOST_REQUIRE_EQUAL(out, bytes<ec_compressed_size>(connected_key_hash_summary));
+}
+
+BOOST_AUTO_TEST_CASE(silent_payment__summarize__connected_key_hash__expected)
+{
+    ec_compressed out{};
+    BOOST_REQUIRE(silent_payment::summarize(out, connected_key_hash_spend(false)));
+    BOOST_REQUIRE_EQUAL(out, bytes<ec_compressed_size>(connected_key_hash_summary));
+}
+
 BOOST_AUTO_TEST_CASE(silent_payment__scan__unlabeled_match__expected)
 {
     const auto scan = base16_array("0f694e068028a717f8af6b9411f9a133dd3565258714cc226594b34db90c1f2c");
