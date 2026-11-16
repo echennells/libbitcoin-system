@@ -43,6 +43,7 @@ enum block_error_t : uint8_t
     anachronistic_timestamp,
     incorrect_proof_of_work,
     early_timestamp,
+    negative_timespan,
 
     // confirm header
     orphan_block,
@@ -65,7 +66,10 @@ enum block_error_t : uint8_t
     block_sigop_limit,
     invalid_witness_commitment,
     block_weight_limit,
-    temporary_hash_limit,
+    invalid_signet_solution,
+    invalid_transaction_size,
+    coinbase_locktime_mismatch,
+    coinbase_sequence_final,
 
     // connect block
     invalid_signature,
@@ -77,7 +81,7 @@ enum block_error_t : uint8_t
     block_error_last
 };
 
-DECLARE_ERROR_T_CODE_CATEGORY(block_error);
+DECLARE_ERROR_T_CODE_CATEGORY(block_error, BC_API);
 
 } // namespace error
 } // namespace system

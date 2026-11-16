@@ -45,16 +45,18 @@ public:
 
     /// Constructors.
     transaction() NOEXCEPT;
+    transaction(uint32_t tx_version) NOEXCEPT;
     transaction(const data_chunk& decoded) NOEXCEPT;
     transaction(const std::string& encoded) NOEXCEPT;
     transaction(const chain::transaction& unsigned_tx) NOEXCEPT;
-    transaction(uint32_t tx_version) NOEXCEPT;
+    transaction(const chain::transaction& unsigned_tx,
+        uint32_t version) NOEXCEPT;
 
     /// Operators.
     bool operator==(const transaction& other) const NOEXCEPT;
     bool operator!=(const transaction& other) const NOEXCEPT;
-    friend std::istream& operator>>(std::istream& in, transaction& to);
-    friend std::ostream& operator<<(std::ostream& out,
+    friend BC_API std::istream& operator>>(std::istream& in, transaction& to);
+    friend BC_API std::ostream& operator<<(std::ostream& out,
         const transaction& of) NOEXCEPT;
 
     /// Cast operators.
@@ -110,10 +112,12 @@ private:
     /// Factories.
     static transaction from_data(const data_chunk& decoded) NOEXCEPT;
     static transaction from_string(const std::string& encoded) NOEXCEPT;
-    static transaction from_transaction(const chain::transaction& tx) NOEXCEPT;
+    static transaction from_transaction(const chain::transaction& tx,
+        uint32_t version) NOEXCEPT;
 
     bool parse(reader& source) NOEXCEPT;
-    bool parse_global(reader& source) NOEXCEPT;
+    bool parse_global(reader& source, size_t& input_count,
+        size_t& output_count) NOEXCEPT;
     bool finalize(input& in, uint32_t index) NOEXCEPT;
     chain::input::cptr extract_input(size_t index) const NOEXCEPT;
 

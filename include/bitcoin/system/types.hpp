@@ -19,10 +19,13 @@
 #ifndef LIBBITCOIN_SYSTEM_TYPES_HPP
 #define LIBBITCOIN_SYSTEM_TYPES_HPP
 
+#include <atomic>
 #include <tuple>
 #include <utility>
 #include <variant>
+#include <vector>
 #include <bitcoin/system/allocator.hpp>
+#include <bitcoin/system/uintx/uintx.hpp>
 
 namespace libbitcoin {
 
@@ -33,6 +36,19 @@ namespace libbitcoin {
 /// std_array aliased because MSVS highlights `array` as a reserved word.
 template <typename Type, size_t Size>
 using std_array = std::array<Type, Size>;
+
+/// std_array aligned to its element, as clang-cl under-aligns a std::array of
+/// vectors (the MSVC STL declares std::array under pragma pack). Alignment is
+/// requested only for over-aligned elements, as a requested alignment alters
+/// msvc x86 argument passing.
+template <typename Type, size_t Size,
+    bool = (alignof(Type) > alignof(std::max_align_t))>
+struct aligned_array
+  : std_array<Type, Size> {};
+
+template <typename Type, size_t Size>
+struct alignas(Type) aligned_array<Type, Size, true>
+  : std_array<Type, Size> {};
 
 /// std_vector aliased to allow seamless conditional allocator usage.
 /// The default area is applied by default, so remains globally relocatable.
@@ -137,26 +153,8 @@ using to_greater_type = iif<
 /// uintx_t
 /// ---------------------------------------------------------------------------
 
-/// Boost changed the Bits type from unsigned to size_t in v1.79.
-using uintx_size_t = decltype(
-    boost::multiprecision::cpp_int_backend<8u, 8u,
-    boost::multiprecision::unsigned_magnitude,
-    boost::multiprecision::unchecked, void>{}.size());
-
-/// Template for constructing uintx types.
-/// There is no dynamic memory allocation when minBits == maxBits.
-template <uintx_size_t Bits> // <== uintx_size_t
-using uintx_t = boost::multiprecision::number<
-    boost::multiprecision::cpp_int_backend<Bits, Bits,
-    boost::multiprecision::unsigned_magnitude,
-    boost::multiprecision::unchecked, void>>;
-
-/// Cannot generalize because no boost support for unsigned arbitrary precision.
-/// Otherwise uintx_t<0> would suffice. uintx can construct from uintx_t types
-/// but is not a base type. Use of signed types here would also not generalize
-/// as boost uses a different allocator for arbitrary precision. So we are stuck
-/// with this seam, requiring template specialization for uintx.
-typedef boost::multiprecision::cpp_int uintx;
+/// The template parameter type of uintx_t.
+using uintx_size_t = size_t;
 
 /// These are predefined due to use in the library, but any width is valid.
 typedef uintx_t<5u> uint5_t;
@@ -316,5 +314,16 @@ struct place2 {};
 struct place3 {};
 
 } // namespace libbitcoin
+
+namespace std
+{
+template <typename Type, size_t Size, bool Aligned>
+struct tuple_size<libbitcoin::aligned_array<Type, Size, Aligned>>
+  : tuple_size<libbitcoin::std_array<Type, Size>> {};
+
+template <size_t Index, typename Type, size_t Size, bool Aligned>
+struct tuple_element<Index, libbitcoin::aligned_array<Type, Size, Aligned>>
+  : tuple_element<Index, libbitcoin::std_array<Type, Size>> {};
+} // namespace std
 
 #endif

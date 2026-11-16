@@ -19,7 +19,6 @@
 #include <bitcoin/system/unicode/utf8_everywhere/environment.hpp>
 
 #include <cstdlib>
-#include <bitcoin/system/boost.hpp>
 #include <bitcoin/system/define.hpp>
 #include <bitcoin/system/math/math.hpp>
 #include <bitcoin/system/unicode/ascii.hpp>
@@ -140,7 +139,7 @@ size_t to_utf16(size_t& remainder, wchar_t out_to[], size_t to_chars,
 // BC_USE_LIBBITCOIN_MAIN
 // ----------------------------------------------------------------------------
 
-#ifdef HAVE_MSC
+#ifdef HAVE_WINDOWS
 
 void free_environment(char* environment[]) NOEXCEPT
 {
@@ -191,7 +190,7 @@ char** allocate_environment(int argc, wchar_t* argv[]) NOEXCEPT
             return nullptr;
         }
 
-        std::copy_n(utf8.begin(), size, arguments[arg]);
+        std::copy_n(utf8.cbegin(), size, arguments[arg]);
 
         // Row terminator (arguments[][] is assured).
         BC_PUSH_WARNING(NO_DEREFERENCE_NULL_POINTER)
@@ -222,11 +221,6 @@ char** allocate_environment(wchar_t* environment[]) NOEXCEPT
 int call_utf8_main(int argc, wchar_t* argv[],
     int(*main)(int argc, char* argv[])) NOEXCEPT
 {
-    // TODO: verify std::filesystem::path is inbued as it was with boost.
-    constexpr auto utf8_locale_name = "en_US.UTF8";
-    boost::locale::generator locale{};
-    std::locale::global(locale(utf8_locale_name));
-
     auto backup = environ;
     auto environment = allocate_environment(_wenviron);
 
@@ -252,7 +246,7 @@ int call_utf8_main(int argc, wchar_t* argv[],
     return result;
 }
 
-#endif // HAVE_MSC
+#endif // HAVE_WINDOWS
 
 BC_POP_WARNING()
 BC_POP_WARNING()

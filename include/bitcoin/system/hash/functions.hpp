@@ -23,6 +23,7 @@
 #include <bitcoin/system/data/data.hpp>
 #include <bitcoin/system/define.hpp>
 #include <bitcoin/system/endian/endian.hpp>
+#include <bitcoin/system/hash/algorithms.hpp>
 #include <bitcoin/system/math/math.hpp>
 
 namespace libbitcoin {
@@ -135,6 +136,11 @@ INLINE data_chunk bitcoin_chunk(const Type& data) NOEXCEPT;
 INLINE hash_digest tagged_hash(const std::string& tag,
     const data_slice& message) NOEXCEPT;
 
+/// Taproot tagged hash state after sha256(Tag) || sha256(Tag) [bip340].
+template <data_t Tag>
+constexpr sha256::state_t tagged_midstate = sha256::midstate(
+    sha256::simple_hash(Tag.data), sha256::simple_hash(Tag.data));
+
 /// Merkle root from a bitcoin_hash set [chain].
 INLINE hash_digest merkle_root(hashes&& set) NOEXCEPT;
 
@@ -194,9 +200,9 @@ inline bool operator!=(const bc::system::hash_cref& left,
 }
 } // namespace std
 
-/// Extend std and boost namespaces with djb2_hash.
+/// Extend std namespace with djb2_hash.
 /// ---------------------------------------------------------------------------
-/// This allows data_array/chunk to be incorporated into std/boost hash tables.
+/// This allows data_array/chunk to be incorporated into std hash tables.
 
 namespace std
 {
@@ -227,27 +233,6 @@ struct hash<bc::system::hash_cref>
     }
 };
 } // namespace std
-
-namespace boost
-{
-template <>
-struct hash<bc::system::data_chunk>
-{
-    size_t operator()(const bc::system::data_chunk& data) const NOEXCEPT
-    {
-        return bc::system::djb2_hash(data);
-    }
-};
-
-template <size_t Size>
-struct hash<bc::system::data_array<Size>>
-{
-    size_t operator()(const bc::system::data_array<Size>& data) const NOEXCEPT
-    {
-        return bc::system::djb2_hash(data);
-    }
-};
-} // namespace boost
 
 #include <bitcoin/system/impl/hash/functions.ipp>
 

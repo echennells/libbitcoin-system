@@ -21,10 +21,12 @@
 
 #include <bitcoin/system/wallet/neutrino.hpp>
 
+#include <numeric>
 #include <bitcoin/system/data/data.hpp>
 #include <bitcoin/system/define.hpp>
 #include <bitcoin/system/filter/filter.hpp>
 #include <bitcoin/system/hash/hash.hpp>
+#include <bitcoin/system/math/math.hpp>
 #include <bitcoin/system/stream/stream.hpp>
 
 namespace libbitcoin {
@@ -35,6 +37,27 @@ namespace neutrino {
 constexpr uint8_t golomb_bits = 19;
 constexpr uint64_t golomb_target_false_positive_rate = 784931;
 constexpr auto rate = golomb_target_false_positive_rate;
+
+template <typename Scripts>
+static bool construct_filter(data_chunk& out, const siphash_key& key,
+    const Scripts& scripts) NOEXCEPT
+{
+    const auto hashes = golomb::hash_distinct(scripts, key);
+    const auto count = hashes.size();
+    out.resize(variable_size(count) + golomb::construct_bound(count,
+        golomb_bits, rate));
+
+    stream::out::fast stream(out);
+    write::bits::fast writer(stream);
+    writer.write_variable(count);
+    golomb::construct(writer, hashes, golomb_bits, rate);
+    writer.flush();
+    if (!writer)
+        return false;
+
+    out.resize(writer.get_write_position());
+    return true;
+}
 
 bool compute_filter(data_chunk& out, const chain::block& block) NOEXCEPT
 {
@@ -68,16 +91,66 @@ bool compute_filter(data_chunk& out, const chain::block& block) NOEXCEPT
         }
     }
 
-    distinct(scripts);
+    return construct_filter(out, key, scripts);
+}
 
-    // A vector (push) stream is used because the size is not known a-priori.
-    stream::out::data stream(out);
-    write::bits::ostream writer(stream);
+static size_t script_count(const chain::view::block& block) NOEXCEPT
+{
+    const auto sum = [](size_t total, const auto& tx) NOEXCEPT
+    {
+        return ceilinged_add(total, tx.outputs());
+    };
 
-    writer.write_variable(scripts.size());
-    golomb::construct(writer, scripts, golomb_bits, key, rate);
-    writer.flush();
-    return !!writer;
+    const auto& txs = block.views();
+    return ceilinged_add(block.spends(),
+        std::accumulate(txs.cbegin(), txs.cend(), zero, sum));
+}
+
+bool compute_filter(data_chunk& out, const chain::view::block& block) NOEXCEPT
+{
+    const auto hash = block.hash();
+    const auto key = to_siphash_key(slice<zero, to_half(hash_size)>(hash));
+    std::vector<data_slice> scripts{};
+    scripts.reserve(script_count(block));
+
+    for (const auto& tx: block.views())
+    {
+        if (!tx.is_coinbase())
+        {
+            for (auto in = tx.inputs_begin(); in != tx.inputs_end(); ++in)
+            {
+                if (is_null(in->prevout))
+                    return false;
+
+                if (!is_zero(in->prevout->script_size()))
+                    scripts.push_back(in->prevout->script_data());
+            }
+        }
+
+        const auto outputs = tx.outputs_data();
+        stream::in::fast stream{ outputs };
+        read::bytes::fast source{ stream };
+        for (size_t output{}; output < tx.outputs(); ++output)
+        {
+            // bip138: any "nil" items MUST NOT be included.
+            // bip138: exclude all outputs that start with OP_RETURN.
+            source.skip_bytes(sizeof(uint64_t));
+            const auto size = source.read_size();
+            const auto op_return = !is_zero(size) &&
+                (source.peek_byte() == to_value(chain::opcode::op_return));
+
+            const auto* script = std::next(outputs.data(),
+                source.get_read_position());
+            source.skip_bytes(size);
+            if (!is_zero(size) && !op_return && source)
+                scripts.emplace_back(script, std::next(script, size));
+        }
+
+        if (!source)
+            return false;
+    }
+
+    return construct_filter(out, key, scripts);
 }
 
 hash_digest compute_header(const hash_digest& previous_header,
@@ -121,7 +194,7 @@ bool match_filter(const block_filter& filter,
 
     data_stack stack{};
     stack.reserve(scripts.size());
-    std::for_each(scripts.begin(), scripts.end(),
+    std::for_each(scripts.cbegin(), scripts.cend(),
         [&](const auto& script) NOEXCEPT
         {
             if (!script.ops().empty())
@@ -160,7 +233,7 @@ bool match_filter(const block_filter& filter,
         return false;
 
     chain::scripts stack(addresses.size());
-    std::transform(addresses.begin(), addresses.end(), stack.begin(),
+    std::transform(addresses.cbegin(), addresses.cend(), stack.begin(),
         [=](const wallet::payment_address& address) NOEXCEPT
         {
             return address.output_script(p2kh_prefixh, p2sh_prefix);

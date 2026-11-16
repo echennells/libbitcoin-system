@@ -1,0 +1,1150 @@
+/**
+ * Copyright (c) 2011-2026 libbitcoin developers
+ *
+ * This file is part of libbitcoin.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+#include "interface.hpp"
+
+#include <atomic>
+#include <new>
+#include <bitcoin/system/crypto/maybe_random.hpp>
+#include <bitcoin/system/crypto/secp256k1/algorithm.hpp>
+#include <bitcoin/system/data/data.hpp>
+#include <bitcoin/system/define.hpp>
+#include <bitcoin/system/hash/hash.hpp>
+#include <bitcoin/system/math/math.hpp>
+
+#if defined(HAVE_SECP256K1)
+
+BC_PUSH_WARNING(NO_UNGUARDED_POINTERS)
+BC_PUSH_WARNING(NO_POINTER_ARITHMETIC)
+BC_PUSH_WARNING(NO_ARRAY_TO_POINTER_DECAY)
+
+struct secp256k1_context
+{
+    unsigned int flags{};
+};
+
+namespace libbitcoin {
+namespace system {
+namespace secp256k1 {
+
+// local
+// ----------------------------------------------------------------------------
+
+constexpr auto success = 1;
+constexpr auto failure = 0;
+
+class local
+  : public algorithm
+{
+public:
+    using affine = affine_t<uint64_t>;
+    using jacobian = jacobian_t<uint64_t>;
+    using field = field_t<uint64_t>;
+    using scalar = scalar_t;
+    using bytes = bytes_t;
+
+    using algorithm::add;
+    using algorithm::add_complete;
+    using algorithm::declassify;
+    using algorithm::from_bytes;
+    using algorithm::inverse;
+    using algorithm::is_high;
+    using algorithm::is_odd_element;
+    using algorithm::is_overflow;
+    using algorithm::is_zero_scalar;
+    using algorithm::lift;
+    using algorithm::linear;
+    using algorithm::multiply;
+    using algorithm::negate;
+    using algorithm::nonce_schnorr;
+    using algorithm::normalize;
+    using algorithm::normalizes_to_zero;
+    using algorithm::recover;
+    using algorithm::secret_multiply;
+    using algorithm::select;
+    using algorithm::swift_decode;
+    using algorithm::swift_fraction;
+    using algorithm::to_affine;
+    using algorithm::to_mask;
+    using algorithm::verify_ecdsa;
+    using algorithm::verify_schnorr;
+    using algorithm::wipe;
+
+    // Representations.
+    // ------------------------------------------------------------------------
+    // Opaque values hold 64 bit words in native byte order.
+
+    template <size_t Offset, size_t Size>
+    static scalar get_words(const data_array<Size>& in) NOEXCEPT
+    {
+        if constexpr (have_arm32)
+        {
+            scalar words{};
+            const auto& bytes = array_cast<uint8_t, sizeof(scalar), Offset>(in);
+            std::copy(bytes.cbegin(), bytes.cend(),
+                array_cast<uint8_t>(words).begin());
+            return words;
+        }
+        else
+        {
+            return array_cast<uint64_t, array_count<scalar>, Offset>(in);
+        }
+    }
+
+    template <size_t Offset, size_t Size>
+    static void set_words(data_array<Size>& out, const scalar& words) NOEXCEPT
+    {
+        if constexpr (have_arm32)
+        {
+            const auto& bytes = array_cast<uint8_t>(words);
+            std::copy(bytes.cbegin(), bytes.cend(),
+                std::next(out.begin(), Offset));
+        }
+        else
+        {
+            array_cast<uint64_t, array_count<scalar>, Offset>(out) = words;
+        }
+    }
+
+    // A stored point has nonzero x.
+    template <size_t Offset, size_t Size>
+    static bool load(affine& r, const data_array<Size>& in) NOEXCEPT
+    {
+        constexpr auto size = array_count<bytes>;
+        const auto x = get_words<Offset>(in);
+        const auto y = get_words<Offset + size>(in);
+        to_field(r.x, x);
+        to_field(r.y, y);
+        return !is_zero_scalar(x);
+    }
+
+    template <size_t Offset, size_t Size>
+    static void save(data_array<Size>& out, affine point) NOEXCEPT
+    {
+        constexpr auto size = array_count<bytes>;
+        scalar x{}, y{};
+        normalize(point.x);
+        normalize(point.y);
+        to_words(x, point.x);
+        to_words(y, point.y);
+        set_words<Offset>(out, x);
+        set_words<Offset + size>(out, y);
+    }
+
+    template <size_t Size>
+    static void load(scalar& r, scalar& s, const data_array<Size>& in) NOEXCEPT
+    {
+        r = get_words<zero>(in);
+        s = get_words<array_count<bytes>>(in);
+    }
+
+    template <size_t Size>
+    static void save(data_array<Size>& out, const scalar& r,
+        const scalar& s) NOEXCEPT
+    {
+        set_words<zero>(out, r);
+        set_words<array_count<bytes>>(out, s);
+    }
+
+    static const bytes& to_array(const uint8_t* data) NOEXCEPT
+    {
+        return unsafe_array_cast<uint8_t, array_count<bytes>>(data);
+    }
+
+    // Value of bytes mod n.
+    static scalar to_scalar(const uint8_t* data) NOEXCEPT
+    {
+        scalar out{};
+        /* bool */ from_bytes(out, to_array(data));
+        return out;
+    }
+
+    // Value of bytes if below n (out reduced otherwise).
+    static bool to_scalar(scalar& out, const uint8_t* data) NOEXCEPT
+    {
+        return from_bytes(out, to_array(data));
+    }
+
+    // Value of bytes if nonzero and below n, otherwise one.
+    static bool to_secret(scalar& out, const uint8_t* data) NOEXCEPT
+    {
+        auto valid = from_bytes(out, to_array(data));
+        valid &= !is_zero_scalar(out);
+        declassify(valid);
+        out = keep(out, valid, { 1 });
+        return valid;
+    }
+
+    // Validity as a result, and values retained where valid.
+    // ------------------------------------------------------------------------
+
+    static int to_result(bool valid) NOEXCEPT
+    {
+        static_assert(success == 1 && failure == 0);
+        declassify(valid);
+        return to_int<int>(valid);
+    }
+
+    static scalar keep(const scalar& value, bool valid,
+        const scalar& otherwise) NOEXCEPT
+    {
+        scalar out{};
+        select(out, to_mask(valid), value, otherwise);
+        return out;
+    }
+
+    static void keep(uint8_t* out, size_t size, bool valid) NOEXCEPT
+    {
+        const auto mask = narrow_cast<uint8_t>(to_mask(valid));
+        for (size_t index{}; index < size; ++index)
+            out[index] &= mask;
+    }
+
+    template <size_t Size>
+    static void keep(data_array<Size>& out, bool valid) NOEXCEPT
+    {
+        keep(out.data(), out.size(), valid);
+    }
+
+    // Value of bytes mod p (weak).
+    static field to_element(const uint8_t* data) NOEXCEPT
+    {
+        field out{};
+        /* bool */ from_bytes(out, to_array(data));
+        return out;
+    }
+
+    static void to_bytes(uint8_t* out, const scalar& value) NOEXCEPT
+    {
+        bytes data{};
+        algorithm::to_bytes(data, value);
+        std::copy(data.cbegin(), data.cend(), out);
+    }
+
+    static void to_bytes(uint8_t* out, field value) NOEXCEPT
+    {
+        bytes data{};
+        normalize(value);
+        algorithm::to_bytes(data, value);
+        std::copy(data.cbegin(), data.cend(), out);
+    }
+
+    // Blinds.
+    // ------------------------------------------------------------------------
+
+    // Nonzero scalar keyed by the secret, over entropy, a context and a call
+    // count, so that it remains secret and unrepeated where entropy is not.
+    static scalar blind(const scalar& secret, const data_slice& context,
+        uint8_t tag) NOEXCEPT
+    {
+        static std::atomic<uint64_t> calls{};
+        bytes key{}, entropy{};
+        algorithm::to_bytes(key, secret);
+        maybe_random::fill(entropy);
+        const auto call = to_little(calls++);
+
+        scalar out{};
+        LCOV_EXCL_START("Retry requires a hash of zero or above n.")
+        for (uint8_t counter{};; ++counter)
+        {
+            hmac<sha256> mac{ key };
+            mac.write(entropy);
+            mac.write(context);
+            mac.write(call);
+            mac.write(data_array<2>{ tag, counter });
+            auto found = from_bytes(out, mac.flush());
+            found &= !is_zero_scalar(out);
+            declassify(found);
+            if (found)
+                break;
+        }
+        LCOV_EXCL_STOP()
+
+        wipe(key);
+        return out;
+    }
+
+    // Point of the secret, by a blinded multiplication.
+    static affine public_point(const scalar& secret) NOEXCEPT
+    {
+        affine point{};
+        secret_multiply(point, secret, blind(secret, {}, 0));
+        declassify(point);
+        return point;
+    }
+
+    // Nonces.
+    // ------------------------------------------------------------------------
+
+    // HMAC-SHA256 generator of RFC6979 3.2, over key, message, and optional
+    // data and algorithm, returning the output of attempt + 1 calls.
+    static int rfc6979(uint8_t* nonce32, const uint8_t* msg32,
+        const uint8_t* key32, const uint8_t* algo16, void* data,
+        unsigned int attempt) NOEXCEPT
+    {
+        constexpr data_array<1> zero_byte{ 0x00 };
+        constexpr data_array<1> one_byte{ 0x01 };
+
+        data_chunk seed{};
+        seed.reserve(112);
+        const auto& key = to_array(key32);
+        const auto& message = to_array(msg32);
+        seed.insert(seed.cend(), key.cbegin(), key.cend());
+        seed.insert(seed.cend(), message.cbegin(), message.cend());
+        if (!is_null(data))
+        {
+            LCOV_EXCL_START("Wrappers provide no extra data.")
+            const auto& extra = to_array(static_cast<const uint8_t*>(data));
+            seed.insert(seed.cend(), extra.cbegin(), extra.cend());
+            LCOV_EXCL_STOP()
+        }
+
+        if (!is_null(algo16))
+        {
+            LCOV_EXCL_START("Wrappers provide no algorithm.")
+            seed.insert(seed.cend(), algo16, std::next(algo16, 16));
+            LCOV_EXCL_STOP()
+        }
+
+        hash_digest k{}, v{};
+        v.fill(0x01);
+
+        const auto update = [&](const data_array<1>& separator,
+            const data_slice& input) NOEXCEPT
+        {
+            hmac<sha256> keyed{ k };
+            keyed.write(v);
+            keyed.write(separator);
+            keyed.write(input);
+            k = keyed.flush();
+            v = hmac<sha256>::code(v, k);
+        };
+
+        update(zero_byte, seed);
+        update(one_byte, seed);
+
+        LCOV_EXCL_START("Retry requires a nonce of zero or above n.")
+        for (unsigned int call{};; ++call)
+        {
+            if (is_nonzero(call))
+                update(zero_byte, {});
+
+            v = hmac<sha256>::code(v, k);
+            if (call == attempt)
+                break;
+        }
+        LCOV_EXCL_STOP()
+
+        std::copy(v.cbegin(), v.cend(), nonce32);
+        wipe(seed);
+        wipe(k);
+        return success;
+    }
+
+    // BIP340 nonce of secret, x-only public key and message, where the secret
+    // is masked by the tagged hash of the auxiliary data (zeros if null).
+    static hash_digest bip340(const bytes& secret, const bytes& key,
+        const uint8_t* msg32, const uint8_t* aux32) NOEXCEPT
+    {
+        constexpr bytes zeros{};
+        accumulator<sha256> auxiliary{ tagged_midstate<"BIP0340/aux">, one };
+        auxiliary.write(is_null(aux32) ? zeros : to_array(aux32));
+        auto masked = auxiliary.flush();
+        for (size_t index{}; index < masked.size(); ++index)
+            masked[index] = bit_xor(masked[index], secret[index]);
+
+        accumulator<sha256> nonce{ tagged_midstate<"BIP0340/nonce">, one };
+        nonce.write(masked);
+        nonce.write(key);
+        nonce.write(to_array(msg32));
+        return nonce.flush();
+    }
+
+    static scalar challenge(const bytes& r_x, const bytes& key,
+        const data_slice& message) NOEXCEPT
+    {
+        accumulator<sha256> hasher{ tagged_midstate<"BIP0340/challenge">,
+            one };
+        hasher.write(r_x);
+        hasher.write(key);
+        hasher.write(message.size(), message.data());
+
+        scalar out{};
+        /* bool */ from_bytes(out, hasher.flush());
+        return out;
+    }
+
+    static int bip324(uint8_t* output, const uint8_t* x32,
+        const uint8_t* ell_a64, const uint8_t* ell_b64, void*) NOEXCEPT
+    {
+        accumulator<sha256> hasher{ tagged_midstate<
+            "bip324_ellswift_xonly_ecdh">, one };
+        hasher.write(unsafe_array_cast<uint8_t, ec_ellswift_size>(ell_a64));
+        hasher.write(unsafe_array_cast<uint8_t, ec_ellswift_size>(ell_b64));
+        hasher.write(to_array(x32));
+        hasher.flush(output);
+        return success;
+    }
+
+    // ECDSA.
+    // ------------------------------------------------------------------------
+
+    // An invalid secret signs as one, with false returned and zeroed output.
+    static bool sign(scalar& r, scalar& s, uint8_t& id, const uint8_t* msg32,
+        const uint8_t* seckey, secp256k1_nonce_function noncefp,
+        const void* ndata) NOEXCEPT
+    {
+        scalar d{};
+        auto valid = to_secret(d, seckey);
+        const auto nonce = is_null(noncefp) ? &rfc6979 : noncefp;
+        const auto z = to_scalar(msg32);
+        auto done = false;
+        const auto message = data_slice{ to_array(msg32) };
+
+        scalar k{}, m{}, b{};
+        bytes nonce32{};
+        LCOV_EXCL_START("Retry requires a nonce of zero or above n.")
+        for (unsigned int attempt{};; ++attempt)
+        {
+            if (is_zero(nonce(nonce32.data(), msg32, seckey, nullptr,
+                const_cast<void*>(ndata), attempt)))
+                break;
+
+            const auto usable = to_secret(k, nonce32.data());
+            declassify(usable);
+            if (!usable)
+                continue;
+
+            m = blind(d, message, 0);
+            b = blind(d, message, 1);
+            if (sign_ecdsa(r, s, id, d, z, k, m, b))
+            {
+                done = true;
+                break;
+            }
+        }
+        LCOV_EXCL_STOP()
+
+        wipe(d);
+        wipe(k);
+        wipe(m);
+        wipe(b);
+        wipe(nonce32);
+        valid &= done;
+        r = keep(r, valid, {});
+        s = keep(s, valid, {});
+        id &= narrow_cast<uint8_t>(to_mask(valid));
+        declassify(r);
+        declassify(s);
+        declassify(id);
+        return valid;
+    }
+
+    // Schnorr.
+    // ------------------------------------------------------------------------
+
+    // Keypair is secret (big-endian) then public key, a failed keypair loads
+    // as (1, G) and false.
+    static bool load(scalar& secret, affine& point,
+        const secp256k1_keypair& keypair) NOEXCEPT
+    {
+        auto valid = load<array_count<bytes>>(point, keypair.data);
+        valid &= to_secret(secret, keypair.data.data());
+        const auto mask = to_mask(valid);
+        select(point.x, mask, point.x, generator.x);
+        select(point.y, mask, point.y, generator.y);
+        return valid;
+    }
+
+    // Elligator swift.
+    // ------------------------------------------------------------------------
+
+    static void random(bytes& out, const accumulator<sha256>& hasher,
+        uint32_t counter) NOEXCEPT
+    {
+        auto copy = hasher;
+        copy.write(to_little_endian(counter));
+        copy.flush(out.data());
+        declassify(out);
+    }
+
+    // Draws branches and nonzero u below p from hasher until the branch
+    // inverts x, then matches the parity of t to that of y.
+    static void encode(uint8_t* ell64, const affine& point,
+        const accumulator<sha256>& hasher) NOEXCEPT
+    {
+        bytes branches{}, u32{};
+        field u{}, t{};
+        size_t remaining{};
+        uint32_t counter{};
+
+        while (true)
+        {
+            if (is_zero(remaining))
+            {
+                random(branches, hasher, counter++);
+                remaining = 64;
+            }
+
+            --remaining;
+            const auto half = branches[remaining / two];
+            const auto branch = narrow_cast<uint8_t>(
+                (half >> (is_odd(remaining) ? 4u : 0u)) & 7u);
+
+            random(u32, hasher, counter++);
+            if (!from_bytes(u, u32) || normalizes_to_zero(u))
+                continue;
+
+            if (swift_inverse(t, point.x, u, branch))
+                break;
+        }
+
+        if (f::any(is_odd_element(t)) != f::any(is_odd_element(point.y)))
+        {
+            negate(t, t);
+            normalize(t);
+        }
+
+        std::copy(u32.cbegin(), u32.cend(), ell64);
+        to_bytes(std::next(ell64, array_count<bytes>), t);
+    }
+};
+
+} // namespace secp256k1
+} // namespace system
+} // namespace libbitcoin
+
+using namespace libbitcoin;
+using namespace libbitcoin::system;
+using namespace libbitcoin::system::secp256k1;
+
+// Nonce and hash functions.
+// ----------------------------------------------------------------------------
+
+const secp256k1_nonce_function secp256k1_nonce_function_rfc6979 =
+    &local::rfc6979;
+
+const secp256k1_ellswift_xdh_hash_function
+    secp256k1_ellswift_xdh_hash_function_bip324 = &local::bip324;
+
+// Context.
+// ----------------------------------------------------------------------------
+
+secp256k1_context* secp256k1_context_create(unsigned int flags) NOEXCEPT
+{
+    BC_PUSH_WARNING(NO_NEW_OR_DELETE)
+    return new (std::nothrow) secp256k1_context{ flags };
+    BC_POP_WARNING()
+}
+
+void secp256k1_context_destroy(secp256k1_context* ctx) NOEXCEPT
+{
+    BC_PUSH_WARNING(NO_NEW_OR_DELETE)
+    delete ctx;
+    BC_POP_WARNING()
+}
+
+// Keys.
+// ----------------------------------------------------------------------------
+
+int secp256k1_ec_pubkey_parse(const secp256k1_context*,
+    secp256k1_pubkey* pubkey, const uint8_t* input, size_t inputlen) NOEXCEPT
+{
+    pubkey->data = {};
+    local::affine point{};
+    if (inputlen == ec_compressed_size)
+    {
+        const auto& key = unsafe_array_cast<uint8_t, ec_compressed_size>(input);
+        if (!local::from_bytes(point, key))
+            return failure;
+    }
+    else if (inputlen == ec_uncompressed_size)
+    {
+        const auto& key = unsafe_array_cast<uint8_t, ec_uncompressed_size>(
+            input);
+        if (!local::from_bytes(point, key))
+            return failure;
+    }
+    else
+    {
+        return failure;
+    }
+
+    local::save<zero>(pubkey->data, point);
+    return success;
+}
+
+int secp256k1_ec_pubkey_serialize(const secp256k1_context*, uint8_t* output,
+    size_t* outputlen, const secp256k1_pubkey* pubkey,
+    unsigned int flags) NOEXCEPT
+{
+    constexpr auto size = array_count<local::bytes>;
+    const auto compressed = is_nonzero(flags &
+        SECP256K1_FLAGS_BIT_COMPRESSION);
+    const auto required = compressed ? ec_compressed_size :
+        ec_uncompressed_size;
+
+    if (*outputlen < required)
+        return failure;
+
+    std::fill_n(output, *outputlen, uint8_t{});
+    *outputlen = 0;
+    if ((flags & SECP256K1_FLAGS_TYPE_MASK) != SECP256K1_FLAGS_TYPE_COMPRESSION)
+        return failure;
+
+    local::affine point{};
+    if (!local::load<zero>(point, pubkey->data))
+        return failure;
+
+    local::to_bytes(std::next(output), point.x);
+    if (compressed)
+    {
+        output[0] = f::any(local::is_odd_element(point.y)) ? ec_odd_sign :
+            ec_even_sign;
+    }
+    else
+    {
+        output[0] = ec_uncompressed_sign;
+        local::to_bytes(std::next(output, add1(size)), point.y);
+    }
+
+    *outputlen = required;
+    return success;
+}
+
+int secp256k1_ec_seckey_verify(const secp256k1_context*,
+    const uint8_t* seckey) NOEXCEPT
+{
+    local::scalar secret{};
+    return local::to_result(local::to_secret(secret, seckey));
+}
+
+int secp256k1_ec_pubkey_create(const secp256k1_context*,
+    secp256k1_pubkey* pubkey, const uint8_t* seckey) NOEXCEPT
+{
+    local::scalar secret{};
+    const auto valid = local::to_secret(secret, seckey);
+    local::save<zero>(pubkey->data, local::public_point(secret));
+    local::keep(pubkey->data, valid);
+    local::wipe(secret);
+    return local::to_result(valid);
+}
+
+int secp256k1_ec_seckey_negate(const secp256k1_context*,
+    uint8_t* seckey) NOEXCEPT
+{
+    local::scalar secret{};
+    const auto valid = local::to_secret(secret, seckey);
+    local::negate(secret, secret);
+    secret = local::keep(secret, valid, {});
+    local::to_bytes(seckey, secret);
+    local::wipe(secret);
+    return local::to_result(valid);
+}
+
+int secp256k1_ec_pubkey_negate(const secp256k1_context*,
+    secp256k1_pubkey* pubkey) NOEXCEPT
+{
+    local::affine point{};
+    const auto valid = local::load<zero>(point, pubkey->data);
+    pubkey->data = {};
+    if (!valid)
+        return failure;
+
+    local::negate(point, point);
+    local::save<zero>(pubkey->data, point);
+    return success;
+}
+
+int secp256k1_ec_seckey_tweak_add(const secp256k1_context*, uint8_t* seckey,
+    const uint8_t* tweak32) NOEXCEPT
+{
+    local::scalar secret{}, tweak{};
+    auto valid = local::to_secret(secret, seckey);
+    valid &= local::to_scalar(tweak, tweak32);
+    local::add(secret, secret, tweak);
+    valid &= !local::is_zero_scalar(secret);
+    secret = local::keep(secret, valid, {});
+    local::to_bytes(seckey, secret);
+    local::wipe(secret);
+    local::wipe(tweak);
+    return local::to_result(valid);
+}
+
+int secp256k1_ec_pubkey_tweak_add(const secp256k1_context*,
+    secp256k1_pubkey* pubkey, const uint8_t* tweak32) NOEXCEPT
+{
+    local::affine point{}, sum{};
+    local::scalar tweak{};
+    auto valid = local::load<zero>(point, pubkey->data);
+    valid &= local::to_scalar(tweak, tweak32);
+    valid &= local::linear(sum, tweak, point);
+    local::declassify(valid);
+    local::declassify(sum);
+    local::save<zero>(pubkey->data, sum);
+    local::keep(pubkey->data, valid);
+    return local::to_result(valid);
+}
+
+int secp256k1_ec_seckey_tweak_mul(const secp256k1_context*, uint8_t* seckey,
+    const uint8_t* tweak32) NOEXCEPT
+{
+    local::scalar secret{}, tweak{};
+    auto valid = local::to_secret(secret, seckey);
+    valid &= local::to_scalar(tweak, tweak32);
+    valid &= !local::is_zero_scalar(tweak);
+    local::multiply(secret, secret, tweak);
+    secret = local::keep(secret, valid, {});
+    local::to_bytes(seckey, secret);
+    local::wipe(secret);
+    local::wipe(tweak);
+    return local::to_result(valid);
+}
+
+int secp256k1_ec_pubkey_tweak_mul(const secp256k1_context*,
+    secp256k1_pubkey* pubkey, const uint8_t* tweak32) NOEXCEPT
+{
+    local::affine point{}, product{};
+    local::scalar tweak{};
+    auto valid = local::to_secret(tweak, tweak32);
+    valid &= local::load<zero>(point, pubkey->data);
+    local::secret_multiply(product, tweak, point, local::blind(tweak, {}, 0));
+    local::declassify(product);
+    local::save<zero>(pubkey->data, product);
+    local::keep(pubkey->data, valid);
+    return local::to_result(valid);
+}
+
+int secp256k1_ec_pubkey_combine(const secp256k1_context*,
+    secp256k1_pubkey* out, const secp256k1_pubkey* const* ins,
+    size_t n) NOEXCEPT
+{
+    out->data = {};
+    if (is_zero(n))
+        return failure;
+
+    local::jacobian sum{};
+    sum.infinity = max_uint64;
+    for (size_t index{}; index < n; ++index)
+    {
+        local::affine point{};
+        if (!local::load<zero>(point, ins[index]->data))
+            return failure;
+
+        local::add_complete(sum, sum, point);
+    }
+
+    if (f::any(sum.infinity))
+        return failure;
+
+    local::affine point{};
+    local::to_affine(point, sum);
+    local::save<zero>(out->data, point);
+    return success;
+}
+
+// ECDSA.
+// ----------------------------------------------------------------------------
+
+int secp256k1_ecdsa_signature_parse_compact(const secp256k1_context*,
+    secp256k1_ecdsa_signature* sig, const uint8_t* input64) NOEXCEPT
+{
+    local::scalar r{}, s{};
+    if (!local::to_scalar(r, input64) ||
+        !local::to_scalar(s, std::next(input64, array_count<local::bytes>)))
+    {
+        sig->data = {};
+        return failure;
+    }
+
+    local::save(sig->data, r, s);
+    return success;
+}
+
+// Big-endian integers without leading zeros, other than one where the high
+// bit is set.
+int secp256k1_ecdsa_signature_serialize_der(const secp256k1_context*,
+    uint8_t* output, size_t* outputlen,
+    const secp256k1_ecdsa_signature* sig) NOEXCEPT
+{
+    constexpr auto size = array_count<local::bytes>;
+    constexpr uint8_t sequence = 0x30;
+    constexpr uint8_t integer = 0x02;
+    constexpr uint8_t sign = 0x80;
+    constexpr size_t tagged = two;
+    local::scalar r{}, s{};
+    local::load(r, s, sig->data);
+
+    data_array<add1(size)> r_bytes{}, s_bytes{};
+    local::to_bytes(std::next(r_bytes.data()), r);
+    local::to_bytes(std::next(s_bytes.data()), s);
+
+    const auto trim = [](const data_array<add1(size)>& value) NOEXCEPT
+    {
+        size_t start{};
+        while (start < size && is_zero(value[start]) &&
+            value[add1(start)] < sign)
+            ++start;
+
+        return start;
+    };
+
+    const auto r_start = trim(r_bytes);
+    const auto s_start = trim(s_bytes);
+    const auto r_size = add1(size) - r_start;
+    const auto s_size = add1(size) - s_start;
+    const auto content = tagged + r_size + tagged + s_size;
+    const auto total = tagged + content;
+    if (*outputlen < total)
+    {
+        LCOV_EXCL_START("Wrappers provide the maximal buffer.")
+        *outputlen = total;
+        return failure;
+        LCOV_EXCL_STOP()
+    }
+
+    *outputlen = total;
+    auto out = output;
+    *out++ = sequence;
+    *out++ = narrow_cast<uint8_t>(content);
+    *out++ = integer;
+    *out++ = narrow_cast<uint8_t>(r_size);
+    out = std::copy_n(std::next(r_bytes.cbegin(), r_start), r_size, out);
+    *out++ = integer;
+    *out++ = narrow_cast<uint8_t>(s_size);
+    std::copy_n(std::next(s_bytes.cbegin(), s_start), s_size, out);
+    return success;
+}
+
+int secp256k1_ecdsa_signature_serialize_compact(const secp256k1_context*,
+    uint8_t* output64, const secp256k1_ecdsa_signature* sig) NOEXCEPT
+{
+    local::scalar r{}, s{};
+    local::load(r, s, sig->data);
+    local::to_bytes(output64, r);
+    local::to_bytes(std::next(output64, array_count<local::bytes>), s);
+    return success;
+}
+
+int secp256k1_ecdsa_signature_normalize(const secp256k1_context*,
+    secp256k1_ecdsa_signature* sigout,
+    const secp256k1_ecdsa_signature* sigin) NOEXCEPT
+{
+    local::scalar r{}, s{};
+    local::load(r, s, sigin->data);
+    const auto high = local::is_high(s);
+    if (!is_null(sigout))
+    {
+        if (high)
+            local::negate(s, s);
+
+        local::save(sigout->data, r, s);
+    }
+
+    return high ? success : failure;
+}
+
+int secp256k1_ecdsa_verify(const secp256k1_context*,
+    const secp256k1_ecdsa_signature* sig, const uint8_t* msghash32,
+    const secp256k1_pubkey* pubkey) NOEXCEPT
+{
+    local::scalar r{}, s{};
+    local::affine point{};
+    local::load(r, s, sig->data);
+    return !local::is_overflow(r) && !local::is_overflow(s) &&
+        !local::is_high(s) && local::load<zero>(point, pubkey->data) &&
+        local::verify_ecdsa(point, local::to_scalar(msghash32), r, s) ?
+            success : failure;
+}
+
+int secp256k1_ecdsa_sign(const secp256k1_context*,
+    secp256k1_ecdsa_signature* sig, const uint8_t* msghash32,
+    const uint8_t* seckey, secp256k1_nonce_function noncefp,
+    const void* ndata) NOEXCEPT
+{
+    local::scalar r{}, s{};
+    uint8_t id{};
+    const auto valid = local::sign(r, s, id, msghash32, seckey, noncefp,
+        ndata);
+
+    local::save(sig->data, r, s);
+    return local::to_result(valid);
+}
+
+// ECDSA recovery.
+// ----------------------------------------------------------------------------
+
+int secp256k1_ecdsa_recoverable_signature_parse_compact(
+    const secp256k1_context*, secp256k1_ecdsa_recoverable_signature* sig,
+    const uint8_t* input64, int recid) NOEXCEPT
+{
+    local::scalar r{}, s{};
+    if (recid < 0 || recid > 3 || !local::to_scalar(r, input64) ||
+        !local::to_scalar(s, std::next(input64, array_count<local::bytes>)))
+    {
+        sig->data = {};
+        return failure;
+    }
+
+    local::save(sig->data, r, s);
+    sig->data.back() = narrow_sign_cast<uint8_t>(recid);
+    return success;
+}
+
+int secp256k1_ecdsa_recoverable_signature_serialize_compact(
+    const secp256k1_context*, uint8_t* output64, int* recid,
+    const secp256k1_ecdsa_recoverable_signature* sig) NOEXCEPT
+{
+    local::scalar r{}, s{};
+    local::load(r, s, sig->data);
+    local::to_bytes(output64, r);
+    local::to_bytes(std::next(output64, array_count<local::bytes>), s);
+    *recid = sig->data.back();
+    return success;
+}
+
+int secp256k1_ecdsa_sign_recoverable(const secp256k1_context*,
+    secp256k1_ecdsa_recoverable_signature* sig, const uint8_t* msghash32,
+    const uint8_t* seckey, secp256k1_nonce_function noncefp,
+    const void* ndata) NOEXCEPT
+{
+    local::scalar r{}, s{};
+    uint8_t id{};
+    const auto valid = local::sign(r, s, id, msghash32, seckey, noncefp,
+        ndata);
+
+    local::save(sig->data, r, s);
+    sig->data.back() = id;
+    return local::to_result(valid);
+}
+
+int secp256k1_ecdsa_recover(const secp256k1_context*,
+    secp256k1_pubkey* pubkey, const secp256k1_ecdsa_recoverable_signature* sig,
+    const uint8_t* msghash32) NOEXCEPT
+{
+    local::scalar r{}, s{};
+    local::affine point{};
+    local::load(r, s, sig->data);
+    if (!local::recover(point, local::to_scalar(msghash32), r, s,
+        sig->data.back()))
+    {
+        pubkey->data = {};
+        return failure;
+    }
+
+    local::save<zero>(pubkey->data, point);
+    return success;
+}
+
+// Extra keys.
+// ----------------------------------------------------------------------------
+
+int secp256k1_xonly_pubkey_parse(const secp256k1_context*,
+    secp256k1_xonly_pubkey* pubkey, const uint8_t* input32) NOEXCEPT
+{
+    pubkey->data = {};
+    local::field x{};
+    local::affine point{};
+    if (!local::from_bytes(x, local::to_array(input32)) ||
+        !f::any(local::lift(point, x, 0_u64)))
+        return failure;
+
+    local::save<zero>(pubkey->data, point);
+    return success;
+}
+
+int secp256k1_xonly_pubkey_tweak_add_check(const secp256k1_context*,
+    const uint8_t* tweaked_pubkey32, int tweaked_pk_parity,
+    const secp256k1_xonly_pubkey* internal_pubkey,
+    const uint8_t* tweak32) NOEXCEPT
+{
+    local::affine point{}, sum{};
+    local::scalar tweak{};
+    if (!local::load<zero>(point, internal_pubkey->data) ||
+        !local::to_scalar(tweak, tweak32) ||
+        !local::linear(sum, tweak, point))
+        return failure;
+
+    local::bytes x{};
+    local::to_bytes(x.data(), sum.x);
+    const auto odd = f::any(local::is_odd_element(sum.y));
+    return x == local::to_array(tweaked_pubkey32) &&
+        odd == is_nonzero(tweaked_pk_parity) ? success : failure;
+}
+
+int secp256k1_keypair_create(const secp256k1_context*,
+    secp256k1_keypair* keypair, const uint8_t* seckey) NOEXCEPT
+{
+    local::scalar secret{};
+    const auto valid = local::to_secret(secret, seckey);
+    local::to_bytes(keypair->data.data(), secret);
+    local::save<array_count<local::bytes>>(keypair->data,
+        local::public_point(secret));
+    local::keep(keypair->data, valid);
+    local::wipe(secret);
+    return local::to_result(valid);
+}
+
+// Schnorr.
+// ----------------------------------------------------------------------------
+
+// The secret is negated where its point has odd y, as the key is x-only.
+int secp256k1_schnorrsig_sign32(const secp256k1_context*, uint8_t* sig64,
+    const uint8_t* msg32, const secp256k1_keypair* keypair,
+    const uint8_t* aux_rand32) NOEXCEPT
+{
+    local::scalar secret{};
+    local::affine point{};
+    auto valid = local::load(secret, point, *keypair);
+    local::scalar negated{};
+    local::negate(negated, secret);
+    local::select(secret, local::is_odd_element(point.y), negated, secret);
+
+    local::bytes secret_bytes{}, key{}, r_x{};
+    local::to_bytes(secret_bytes.data(), secret);
+    local::to_bytes(key.data(), point.x);
+
+    local::scalar nonce{};
+    local::from_bytes(nonce, local::bip340(secret_bytes, key, msg32,
+        aux_rand32));
+
+    valid &= !local::is_zero_scalar(nonce);
+    nonce = local::keep(nonce, valid, { 1 });
+
+    const auto message = data_slice{ local::to_array(msg32) };
+    auto blinding = local::blind(secret, message, 0);
+    local::nonce_schnorr(r_x, nonce, blinding);
+
+    local::scalar s{};
+    local::multiply(s, local::challenge(r_x, key, message), secret);
+    local::add(s, s, nonce);
+    local::wipe(secret);
+    local::wipe(secret_bytes);
+    local::wipe(nonce);
+    local::wipe(blinding);
+
+    constexpr auto size = array_count<local::bytes>;
+    std::copy(r_x.cbegin(), r_x.cend(), sig64);
+    local::to_bytes(std::next(sig64, size), s);
+    local::keep(sig64, two * size, valid);
+    local::declassify(sig64, two * size);
+    return local::to_result(valid);
+}
+
+int secp256k1_schnorrsig_verify(const secp256k1_context*,
+    const uint8_t* sig64, const uint8_t* msg, size_t msglen,
+    const secp256k1_xonly_pubkey* pubkey) NOEXCEPT
+{
+    constexpr auto size = array_count<local::bytes>;
+    local::field r_x{};
+    local::scalar s{};
+    local::affine point{};
+    if (!local::from_bytes(r_x, local::to_array(sig64)) ||
+        !local::to_scalar(s, std::next(sig64, size)) ||
+        !local::load<zero>(point, pubkey->data))
+        return failure;
+
+    local::bytes key{};
+    local::to_bytes(key.data(), point.x);
+    const auto message = is_zero(msglen) ? data_slice{} :
+        data_slice{ msg, std::next(msg, msglen) };
+
+    return local::verify_schnorr(point, local::challenge(
+        local::to_array(sig64), key, message), r_x, s) ? success : failure;
+}
+
+// ElligatorSwift.
+// ----------------------------------------------------------------------------
+
+int secp256k1_ellswift_decode(const secp256k1_context*,
+    secp256k1_pubkey* pubkey, const uint8_t* ell64) NOEXCEPT
+{
+    local::affine point{};
+    local::swift_decode(point, local::to_element(ell64),
+        local::to_element(std::next(ell64, array_count<local::bytes>)));
+
+    local::save<zero>(pubkey->data, point);
+    return success;
+}
+
+// An invalid secret encodes the key of one, with false returned and zeroed
+// output. Randomness is H(secret || zeros || auxiliary || counter).
+int secp256k1_ellswift_create(const secp256k1_context*, uint8_t* ell64,
+    const uint8_t* seckey32, const uint8_t* auxrnd32) NOEXCEPT
+{
+    constexpr local::bytes zeros{};
+    local::scalar secret{};
+    const auto valid = local::to_secret(secret, seckey32);
+    const auto point = local::public_point(secret);
+    accumulator<sha256> hasher{ tagged_midstate<"secp256k1_ellswift_create">,
+        one };
+    hasher.write(local::to_array(seckey32));
+    hasher.write(zeros);
+    if (!is_null(auxrnd32))
+        hasher.write(local::to_array(auxrnd32));
+
+    local::encode(ell64, point, hasher);
+    local::wipe(secret);
+    local::keep(ell64, ec_ellswift_size, valid);
+    return local::to_result(valid);
+}
+
+// The shared x is that of secret times their point, whose x is decoded as a
+// fraction (y does not affect x of the product). An invalid secret is one.
+int secp256k1_ellswift_xdh(const secp256k1_context*, uint8_t* output,
+    const uint8_t* ell_a64, const uint8_t* ell_b64, const uint8_t* seckey32,
+    int party, secp256k1_ellswift_xdh_hash_function hashfp,
+    void* data) NOEXCEPT
+{
+    const auto theirs = is_zero(party) ? ell_b64 : ell_a64;
+
+    local::field xn{}, xd{}, x{};
+    local::swift_fraction(xn, xd, local::to_element(theirs),
+        local::to_element(std::next(theirs, array_count<local::bytes>)));
+
+    local::inverse(xd, xd);
+    local::multiply(x, xn, xd);
+    local::normalize(x);
+
+    local::affine point{}, shared{};
+    /* bool */ local::lift(point, x, 0_u64);
+
+    local::scalar secret{};
+    auto valid = local::to_secret(secret, seckey32);
+    const auto context = unsafe_array_cast<uint8_t, ec_ellswift_size>(theirs);
+    local::secret_multiply(shared, secret, point,
+        local::blind(secret, context, 0));
+
+    local::bytes shared_x{};
+    local::to_bytes(shared_x.data(), shared.x);
+    const auto hashed = hashfp(output, shared_x.data(), ell_a64, ell_b64,
+        data);
+
+    local::wipe(secret);
+    local::wipe(shared.x);
+    local::wipe(shared.y);
+    local::wipe(shared_x);
+    valid &= is_nonzero(hashed);
+    return local::to_result(valid);
+}
+
+BC_POP_WARNING()
+BC_POP_WARNING()
+BC_POP_WARNING()
+
+#endif

@@ -19,6 +19,7 @@
 #include <bitcoin/system/chain/transaction.hpp>
 
 #include <numeric>
+#include <ranges>
 #include <bitcoin/system/chain/batch/signatures.hpp>
 #include <bitcoin/system/chain/context.hpp>
 #include <bitcoin/system/chain/enums/coverage.hpp>
@@ -146,7 +147,7 @@ read_puts(Source& source) NOEXCEPT
     const auto count = source.read_size(max_count);
 
     puts->reserve(count);
-    for (auto put = zero; put < count; ++put)
+    for (auto put = zero; put < count && source; ++put)
         puts->push_back(to_shared<Put>(source));
 
     // This is a pointer copy (non-const to const).
@@ -267,7 +268,7 @@ transaction::sizes transaction::serialized_size(const input_cptrs& inputs,
 {
     sizes size{ zero, zero };
 
-    std::for_each(inputs.begin(), inputs.end(), [&](const auto& in) NOEXCEPT
+    std::for_each(inputs.cbegin(), inputs.cend(), [&](const auto& in) NOEXCEPT
     {
         size.nominal = ceilinged_add(size.nominal, in->nominal_size());
         if (segregated)
@@ -286,7 +287,7 @@ transaction::sizes transaction::serialized_size(const input_cptrs& inputs,
     const auto base_size =
         ceilinged_add(ceilinged_add(ceilinged_add(base_const_size,
             variable_size(inputs.size())), variable_size(outputs.size())),
-            std::accumulate(outputs.begin(), outputs.end(), zero, outs));
+            std::accumulate(outputs.cbegin(), outputs.cend(), zero, outs));
 
     const auto nominal_size = ceilinged_add(base_size, size.nominal);
 
@@ -365,7 +366,23 @@ bool transaction::is_dusty(uint64_t minimum_output_value) const NOEXCEPT
         return output->is_dust(minimum_output_value);
     };
 
-    return std::any_of(outputs_->begin(), outputs_->end(), dusty);
+    return std::any_of(outputs_->cbegin(), outputs_->cend(), dusty);
+}
+
+// Last output of commitment pattern holds the committed value [bip141].
+bool transaction::get_witness_commitment(hash_cref& commitment) const NOEXCEPT
+{
+    for (const auto& output: std::views::reverse(*outputs_))
+        if (output->committed_hash(commitment))
+            return true;
+
+    return false;
+}
+
+// Coinbase input witness must be 32 byte witness reserved value [bip141].
+bool transaction::get_witness_reservation(hash_cref& reservation) const NOEXCEPT
+{
+    return !inputs_->empty() && inputs_->front()->reserved_hash(reservation);
 }
 
 size_t transaction::signature_operations(bool bip16, bool bip141) const NOEXCEPT
@@ -386,8 +403,8 @@ size_t transaction::signature_operations(bool bip16, bool bip141) const NOEXCEPT
 
     // Overflow returns max_size_t.
     return ceilinged_add(
-        std::accumulate(inputs_->begin(), inputs_->end(), zero, in),
-        std::accumulate(outputs_->begin(), outputs_->end(), zero, out));
+        std::accumulate(inputs_->cbegin(), inputs_->cend(), zero, in),
+        std::accumulate(outputs_->cbegin(), outputs_->cend(), zero, out));
 }
 
 // private
@@ -400,7 +417,7 @@ chain::points transaction::points() const NOEXCEPT
         return input->point();
     };
 
-    std::transform(inputs_->begin(), inputs_->end(), out.begin(), point);
+    std::transform(inputs_->cbegin(), inputs_->cend(), out.begin(), point);
     return out;
 }
 
@@ -413,7 +430,7 @@ transaction::input_iterator transaction::input_at(
     // Guarded by check_signature and create_endorsement.
     BC_ASSERT_MSG(index < inputs_->size(), "invalid input index");
 
-    return std::next(inputs_->begin(), index);
+    return std::next(inputs_->cbegin(), index);
 }
 
 // This is not used internal to the library.
@@ -469,7 +486,7 @@ bool transaction::create_endorsement(endorsement& out, const ec_secret& secret,
 uint32_t transaction::input_index(const input_iterator& input) const NOEXCEPT
 {
     return possible_narrow_and_sign_cast<uint32_t>(
-        std::distance(inputs_->begin(), input));
+        std::distance(inputs_->cbegin(), input));
 }
 
 //*****************************************************************************
@@ -552,7 +569,7 @@ bool transaction::segregated(const chain::inputs& inputs) NOEXCEPT
         return !input.witness().stack().empty();
     };
 
-    return std::any_of(inputs.begin(), inputs.end(), witnessed);
+    return std::any_of(inputs.cbegin(), inputs.cend(), witnessed);
 }
 
 // static/private
@@ -563,7 +580,7 @@ bool transaction::segregated(const input_cptrs& inputs) NOEXCEPT
         return !input->witness().stack().empty();
     };
 
-    return std::any_of(inputs.begin(), inputs.end(), witnessed);
+    return std::any_of(inputs.cbegin(), inputs.cend(), witnessed);
 }
 
 bool transaction::is_segregated() const NOEXCEPT
@@ -603,6 +620,22 @@ bool transaction::is_signature_operations_limited(bool bip16,
     return signature_operations(bip16, bip141) > limit;
 }
 
+size_t transaction::prevout_signature_operations() const NOEXCEPT
+{
+    // Overflow returns max_size_t.
+    const auto in = [](size_t total, const auto& input) NOEXCEPT
+    {
+        return ceilinged_add(total, input->prevout_signature_operations());
+    };
+
+    return std::accumulate(inputs_->cbegin(), inputs_->cend(), zero, in);
+}
+
+bool transaction::is_prevout_signature_operations_limited() const NOEXCEPT
+{
+    return prevout_signature_operations() > max_prevout_sigops;
+}
+
 // Check (context free).
 // ----------------------------------------------------------------------------
 
@@ -621,7 +654,7 @@ bool transaction::is_null_non_coinbase() const NOEXCEPT
     };
 
     // True if not coinbase but has null previous_output(s).
-    return std::any_of(inputs_->begin(), inputs_->end(), invalid);
+    return std::any_of(inputs_->cbegin(), inputs_->cend(), invalid);
 }
 
 bool transaction::is_invalid_coinbase_size() const NOEXCEPT
@@ -651,7 +684,7 @@ bool transaction::is_absolute_locked(size_t height, uint32_t timestamp,
     const auto height_time = locktime_ < locktime_threshold ? height : time;
 
     return !(is_zero(locktime_) || locktime_ < height_time ||
-        std::all_of(inputs_->begin(), inputs_->end(), finalized));
+        std::all_of(inputs_->cbegin(), inputs_->cend(), finalized));
 }
 
 bool transaction::is_missing_prevouts() const NOEXCEPT
@@ -664,7 +697,7 @@ bool transaction::is_missing_prevouts() const NOEXCEPT
         return !input->prevout;
     };
 
-    return std::any_of(inputs_->begin(), inputs_->end(), missing);
+    return std::any_of(inputs_->cbegin(), inputs_->cend(), missing);
 }
 
 // The value() is the sum of own inputs.
@@ -678,7 +711,7 @@ uint64_t transaction::value() const NOEXCEPT
     };
 
     // The amount referenced by inputs.
-    return std::accumulate(inputs_->begin(), inputs_->end(), 0_u64, sum);
+    return std::accumulate(inputs_->cbegin(), inputs_->cend(), 0_u64, sum);
 }
 
 // The spend() is the sum of own outputs.
@@ -691,7 +724,7 @@ uint64_t transaction::spend() const NOEXCEPT
     };
 
     // The amount spent by outputs.
-    return std::accumulate(outputs_->begin(), outputs_->end(), 0_u64, sum);
+    return std::accumulate(outputs_->cbegin(), outputs_->cend(), 0_u64, sum);
 }
 
 // Overspent is invalid (spend exceeds value), while underspent is the fee().
@@ -733,7 +766,7 @@ bool transaction::is_immature(size_t height) const NOEXCEPT
             is_non_coinbase_immature(prevout_height, height);
     };
 
-    return std::any_of(inputs_->begin(), inputs_->end(), immature);
+    return std::any_of(inputs_->cbegin(), inputs_->cend(), immature);
 }
 
 // static
@@ -777,7 +810,7 @@ bool transaction::is_relative_locked(size_t height,
         return input->is_relative_locked(height, median_time_past);
     };
 
-    return std::any_of(inputs_->begin(), inputs_->end(), locked);
+    return std::any_of(inputs_->cbegin(), inputs_->cend(), locked);
 }
 
 bool transaction::is_unconfirmed_spend(size_t height) const NOEXCEPT
@@ -791,7 +824,7 @@ bool transaction::is_unconfirmed_spend(size_t height) const NOEXCEPT
         return height < input->metadata.prevout_height;
     };
 
-    return std::any_of(inputs_->begin(), inputs_->end(), unconfirmed);
+    return std::any_of(inputs_->cbegin(), inputs_->cend(), unconfirmed);
 }
 
 bool transaction::is_confirmed_double_spend(size_t height) const NOEXCEPT
@@ -805,7 +838,7 @@ bool transaction::is_confirmed_double_spend(size_t height) const NOEXCEPT
         return height > input->metadata.spender_height;
     };
 
-    return std::any_of(inputs_->begin(), inputs_->end(), spent);
+    return std::any_of(inputs_->cbegin(), inputs_->cend(), spent);
 }
 
 // An unconfirmed prevout is presumed to confirm first, and is not a coinbase.
@@ -819,7 +852,7 @@ bool transaction::is_unconfirmed_immature(size_t height) const NOEXCEPT
             is_coinbase_immature(input->metadata.prevout_height, height);
     };
 
-    return std::any_of(inputs_->begin(), inputs_->end(), immature);
+    return std::any_of(inputs_->cbegin(), inputs_->cend(), immature);
 }
 
 // Any spender is a conflict, but only a confirmed spender has a height.
@@ -833,7 +866,7 @@ bool transaction::is_confirmed_conflict() const NOEXCEPT
         return !is_zero(height) && (height != max_uint32);
     };
 
-    return std::any_of(inputs_->begin(), inputs_->end(), spent);
+    return std::any_of(inputs_->cbegin(), inputs_->cend(), spent);
 }
 
 bool transaction::is_unconfirmed_conflict() const NOEXCEPT
@@ -845,7 +878,7 @@ bool transaction::is_unconfirmed_conflict() const NOEXCEPT
         return is_zero(input->metadata.spender_height);
     };
 
-    return std::any_of(inputs_->begin(), inputs_->end(), spent);
+    return std::any_of(inputs_->cbegin(), inputs_->cend(), spent);
 }
 
 // Guards (for tx pool without compact blocks).
@@ -949,9 +982,10 @@ code transaction::check(const context& ctx) const NOEXCEPT
 
 // Do not need to invoke on coinbase.
 // This assumes that prevout caching is completed on all inputs.
-code transaction::accept(const context&) const NOEXCEPT
+code transaction::accept(const context& ctx) const NOEXCEPT
 {
     ////BC_ASSERT(!is_coinbase());
+    const auto bip54 = ctx.is_enabled(bip54_sigops_rule);
 
     if (is_coinbase())
         return error::transaction_success;
@@ -959,6 +993,8 @@ code transaction::accept(const context&) const NOEXCEPT
         return error::missing_previous_output;
     if (is_overspent())
         return error::spend_exceeds_value;
+    if (bip54 && is_prevout_signature_operations_limited())
+        return error::transaction_prevout_sigop_limit;
 
     return error::transaction_success;
 }
@@ -1033,7 +1069,7 @@ code transaction::connect(const context& ctx,
     if (is_coinbase())
         return error::transaction_success;
 
-    for (auto in = inputs_->begin(); in != inputs_->end(); ++in)
+    for (auto in = inputs_->cbegin(); in != inputs_->cend(); ++in)
         if (const auto ec = connect_input(ctx, in, capture))
             return ec;
 

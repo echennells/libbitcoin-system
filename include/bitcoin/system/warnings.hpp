@@ -42,17 +42,22 @@
         // generation. For these warnings, the state of the warning in effect
         // when the compiler reaches the function definition remains in effect
         // for the rest of the function. - MSDN
+        #define SIGNED_UNSIGNED_COMPARE 4018
         #define NARROWING_CONVERSION 4244
         #define DIAMOND_INHERITANCE 4250
         #define SIZE_NARROWING_CONVERSION 4267
         #define THROW_FROM_NOEXCEPT 4297
         #define TRUNCATED_CONSTANT 4310
+        #define SIGNED_UNSIGNED_EQUALITY 4389
         #define LOCAL_VARIABLE_NOT_INITIALIZED 4700
         #define UNREACHABLE_CODE 4702
         #define NOT_INLINED 4714
         #define DISCARDING_NON_DISCARDABLE 4834
+        #define DEPRECATED_DECLARATION 4996
 
         // Global (see below).
+        #define DLL_INTERFACE_MEMBER 4251
+        #define DLL_INTERFACE_BASE 4275
         #define LOCAL_HIDES_GLOBAL 4459
         #define ASSIGNMENT_WITHIN_CONDITIONAL 4706
 
@@ -107,11 +112,17 @@
     #define BC_POP_WARNING()
 #endif
 
+// Suppress C4251: member needs to have dll-interface to be used by clients.
+// Suppress C4275: non dll-interface base of a dll-interface class.
+// These arise from std members and bases of exported classes.
+BC_DISABLE_WARNING(DLL_INTERFACE_MEMBER)
+BC_DISABLE_WARNING(DLL_INTERFACE_BASE)
+
  // Suppress C4706: assignment within conditional expression (allowed).
 BC_DISABLE_WARNING(ASSIGNMENT_WITHIN_CONDITIONAL)
 
 // Suppress C4459: declaration of 'one' hides global declaration.
-// This arises from boost templates defining 'one' as public variable.
+// This arises from secp256k1 algorithm locals named 'zero' and 'one'.
 BC_DISABLE_WARNING(LOCAL_HIDES_GLOBAL)
 
 #endif

@@ -19,7 +19,11 @@
 #ifndef LIBBITCOIN_SYSTEM_CRYPTO_CRYPTO_HPP
 #define LIBBITCOIN_SYSTEM_CRYPTO_CRYPTO_HPP
 
-#include <bitcoin/system/crypto/aes256.hpp>
+#include <bitcoin/system/crypto/aes/aes.hpp>
+#include <bitcoin/system/crypto/aes/algorithm.hpp>
+#include <bitcoin/system/crypto/aes/ghash.hpp>
+#include <bitcoin/system/crypto/aes_gcm.hpp>
+#include <bitcoin/system/crypto/algorithms.hpp>
 #include <bitcoin/system/crypto/chacha20.hpp>
 #include <bitcoin/system/crypto/chacha20_poly1305.hpp>
 #include <bitcoin/system/crypto/fschacha20.hpp>
@@ -27,9 +31,16 @@
 #include <bitcoin/system/crypto/der_parser.hpp>
 #include <bitcoin/system/crypto/poly1305.hpp>
 #include <bitcoin/system/crypto/maybe_random.hpp>
+#include <bitcoin/system/crypto/nist/algorithm.hpp>
+#include <bitcoin/system/crypto/nist/nist.hpp>
 #include <bitcoin/system/crypto/salsa20.hpp>
 #include <bitcoin/system/crypto/secp256k1.hpp>
-#include <bitcoin/system/crypto/secp256k1_batch.hpp>
+#include <bitcoin/system/crypto/secp256k1/algorithm.hpp>
+#include <bitcoin/system/crypto/secp256k1/batch/batch.hpp>
+#include <bitcoin/system/crypto/secp256k1/tables.hpp>
+#include <bitcoin/system/crypto/shamir/algorithm.hpp>
+#include <bitcoin/system/crypto/shamir/rs1024.hpp>
+#include <bitcoin/system/crypto/shamir/shamir.hpp>
 #include <bitcoin/system/crypto/x25519.hpp>
 #include <bitcoin/system/crypto/xsalsa20_poly1305.hpp>
 

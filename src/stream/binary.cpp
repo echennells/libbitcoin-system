@@ -35,7 +35,7 @@ constexpr bool is_binary(char character) NOEXCEPT
 
 bool binary::is_base2(const std::string& text) NOEXCEPT
 {
-    return std::all_of(text.begin(), text.end(), is_binary);
+    return std::all_of(text.cbegin(), text.cend(), is_binary);
 }
 
 // constructors
@@ -137,7 +137,7 @@ binary::operator const data_chunk&() const NOEXCEPT
 bool binary::operator[](size_t index) const NOEXCEPT
 {
     const auto byte = index / byte_bits;
-    return (byte < bits_) && get_left(bytes_[byte], index % byte_bits);
+    return (index < bits_) && get_left(bytes_[byte], index % byte_bits);
 }
 
 bool binary::operator<(const binary& other) const NOEXCEPT

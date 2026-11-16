@@ -22,22 +22,10 @@
 #include <bitcoin/system/define.hpp>
 #include <bitcoin/system/math/math.hpp>
 
-// Each sve typed is identical but unique identity carries lane expectation.
-#define SVE_TYPE(bits) \
-    struct _xint##bits##_t \
-    { \
-        svuint32_t value; \
-        explicit _xint##bits##_t(svuint32_t a) : value(a) {} \
-        _xint##bits##_t() = default; \
-    }
-
 // xint types are always defined, though must be mocked when not aliased.
 #define MOCK_TYPE(bits) std_array<uint8_t, bytes<bits>>
 
 // Intrinsic headers declare at global scope, so cannot be namespace-included.
-#if defined(HAVE_SVE)
-    #include <arm_sve.h>
-#endif
 #if defined(HAVE_NEON)
     #include <arm_neon.h>
 #endif
@@ -51,18 +39,13 @@ namespace libbitcoin {
 /// Always define xint128_t, xint256_t, xint512_t. Avoids conditional compile.
 /// ---------------------------------------------------------------------------
 
-#if defined(HAVE_SVE)
-    using xint128_t = SVE_TYPE(128);
-    using xint256_t = SVE_TYPE(256);
-    using xint512_t = SVE_TYPE(512);
-#endif
 #if defined(HAVE_NEON)
     using xint128_t = uint32x4_t;
     using xint256_t = MOCK_TYPE(256);
     using xint512_t = MOCK_TYPE(512);
 #endif
 #if defined(HAVE_XCPU)
-    #if defined(HAVE_SSE4)
+    #if defined(HAVE_SSE41)
         using xint128_t = __m128i;
     #else
         using xint128_t = MOCK_TYPE(128);
@@ -78,7 +61,7 @@ namespace libbitcoin {
         using xint512_t = MOCK_TYPE(512);
     #endif
 #endif
-#if !defined(HAVE_SVE) && !defined(HAVE_NEON) && !defined(HAVE_XCPU)
+#if !defined(HAVE_NEON) && !defined(HAVE_XCPU)
     using xint128_t = MOCK_TYPE(128);
     using xint256_t = MOCK_TYPE(256);
     using xint512_t = MOCK_TYPE(512);
@@ -86,14 +69,6 @@ namespace libbitcoin {
 
 /// Lane selectors.
 /// ---------------------------------------------------------------------------
-
-/// Specializations of size_of (used by capacity) for SVE types.
-template<>
-constexpr size_t size_of<xint128_t>() { return bytes<128>; }
-template<>
-constexpr size_t size_of<xint256_t>() { return bytes<256>; }
-template<>
-constexpr size_t size_of<xint512_t>() { return bytes<512>; }
 
 /// Define lane-expanded 32/64 bit types.
 template <typename Integral, size_t Lanes,
@@ -135,6 +110,23 @@ constexpr bool have_() NOEXCEPT
 template <typename Extended, if_extended<Extended> = true>
 constexpr bool have = have_<Extended>();
 
+template <typename Extended, if_extended<Extended> = true>
+constexpr bool have_ifma_() NOEXCEPT
+{
+    if constexpr (is_same_type<Extended, xint512_t>)
+        return have_ifma_512;
+    else if constexpr (is_same_type<Extended, xint256_t>)
+        return have_ifma_256;
+    else if constexpr (is_same_type<Extended, xint128_t>)
+        return have_ifma_128;
+    else
+        return false;
+}
+
+/// Availability of 52 bit fused multiply-add (madd52) for extended integer.
+template <typename Extended, if_extended<Extended> = true>
+constexpr bool have_ifma = have_ifma_<Extended>();
+
 template <typename Integral, size_t Lanes,
     if_integral<Integral> = true>
 constexpr bool have_lanes_() NOEXCEPT
@@ -163,7 +155,6 @@ constexpr bool have_lanes = have_lanes_<Integral, Lanes>();
 
 } // namespace libbitcoin
 
-#undef SVE_TYPE
 #undef MOCK_TYPE
 
 #endif

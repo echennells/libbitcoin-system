@@ -12,30 +12,6 @@
     <ProjectName>libbitcoin-system</ProjectName>
   </PropertyGroup>
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="DebugDLL|ARM">
-      <Configuration>DebugDLL</Configuration>
-      <Platform>ARM</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="ReleaseDLL|ARM">
-      <Configuration>ReleaseDLL</Configuration>
-      <Platform>ARM</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="DebugLTCG|ARM">
-      <Configuration>DebugLTCG</Configuration>
-      <Platform>ARM</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="ReleaseLTCG|ARM">
-      <Configuration>ReleaseLTCG</Configuration>
-      <Platform>ARM</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="DebugLIB|ARM">
-      <Configuration>DebugLIB</Configuration>
-      <Platform>ARM</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="ReleaseLIB|ARM">
-      <Configuration>ReleaseLIB</Configuration>
-      <Platform>ARM</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="DebugDLL|ARM64">
       <Configuration>DebugDLL</Configuration>
       <Platform>ARM64</Platform>
@@ -120,6 +96,22 @@
     <Import Project="$(ProjectDir)..\..\properties\Output.props" />
     <Import Project="$(ProjectDir)$(ProjectName).props" />
   </ImportGroup>
+  <PropertyGroup Label="Git">
+    <VersionMajor>4</VersionMajor>
+    <VersionMinor>0</VersionMinor>
+  </PropertyGroup>
+  <ItemGroup>
+    <ConfigurableFile Include="..\..\..\..\include\bitcoin\system\version.hpp.in">
+      <Generated>..\..\..\..\build\include\bitcoin\system\version.hpp</Generated>
+    </ConfigurableFile>
+    <ConfigurableFile Include="..\..\..\..\src\version.cpp.in">
+      <Generated>..\..\..\..\build\src\version.cpp</Generated>
+    </ConfigurableFile>
+    <ClInclude Include="..\..\..\..\build\include\bitcoin\system\version.hpp" />
+    <ClCompile Include="..\..\..\..\build\src\version.cpp">
+      <ObjectFileName>$(IntDir)build_src_version.obj</ObjectFileName>
+    </ClCompile>
+  </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\src\arena.cpp" />
     <ClCompile Include="..\..\..\..\src\chain\block.cpp">
@@ -188,21 +180,42 @@
       <ObjectFileName>$(IntDir)src_chain_script.obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="..\..\..\..\src\chain\script_extract.cpp" />
+    <ClCompile Include="..\..\..\..\src\chain\short_id.cpp" />
     <ClCompile Include="..\..\..\..\src\chain\signatures.cpp" />
+    <ClCompile Include="..\..\..\..\src\chain\signet.cpp" />
     <ClCompile Include="..\..\..\..\src\chain\taproot.cpp" />
     <ClCompile Include="..\..\..\..\src\chain\transaction.cpp">
       <ObjectFileName>$(IntDir)src_chain_transaction.obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="..\..\..\..\src\chain\transaction_cache.cpp" />
-    <ClCompile Include="..\..\..\..\src\chain\transaction_sighash.cpp" />
+    <ClCompile Include="..\..\..\..\src\chain\transaction_sighash.cpp">
+      <ObjectFileName>$(IntDir)src_chain_transaction_sighash.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\src\chain\transaction_sighash_v0.cpp" />
     <ClCompile Include="..\..\..\..\src\chain\transaction_sighash_v1.cpp" />
-    <ClCompile Include="..\..\..\..\src\chain\views\block_view.cpp" />
-    <ClCompile Include="..\..\..\..\src\chain\views\transaction_view.cpp" />
+    <ClCompile Include="..\..\..\..\src\chain\view\block.cpp">
+      <ObjectFileName>$(IntDir)src_chain_view_block.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\chain\view\input.cpp">
+      <ObjectFileName>$(IntDir)src_chain_view_input.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\chain\view\output.cpp">
+      <ObjectFileName>$(IntDir)src_chain_view_output.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\chain\view\transaction.cpp">
+      <ObjectFileName>$(IntDir)src_chain_view_transaction.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\chain\view\transaction_sighash.cpp">
+      <ObjectFileName>$(IntDir)src_chain_view_transaction_sighash.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\src\chain\witness.cpp">
       <ObjectFileName>$(IntDir)src_chain_witness.obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="..\..\..\..\src\chain\witness_extract.cpp" />
+    <ClCompile Include="..\..\..\..\src\compression\deflate.cpp" />
+    <ClCompile Include="..\..\..\..\src\compression\gzip.cpp" />
+    <ClCompile Include="..\..\..\..\src\compression\inflate.cpp" />
+    <ClCompile Include="..\..\..\..\src\compression\zlib.cpp" />
     <ClCompile Include="..\..\..\..\src\config\authority.cpp" />
     <ClCompile Include="..\..\..\..\src\config\base16.cpp" />
     <ClCompile Include="..\..\..\..\src\config\base2.cpp" />
@@ -215,7 +228,9 @@
       <ObjectFileName>$(IntDir)src_config_block.obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="..\..\..\..\src\config\byte.cpp" />
-    <ClCompile Include="..\..\..\..\src\config\endpoint.cpp" />
+    <ClCompile Include="..\..\..\..\src\config\endpoint.cpp">
+      <ObjectFileName>$(IntDir)src_config_endpoint.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\src\config\hash160.cpp" />
     <ClCompile Include="..\..\..\..\src\config\hash256.cpp" />
     <ClCompile Include="..\..\..\..\src\config\header.cpp">
@@ -227,24 +242,23 @@
     <ClCompile Include="..\..\..\..\src\config\output.cpp">
       <ObjectFileName>$(IntDir)src_config_output.obj</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\src\config\parameter.cpp" />
-    <ClCompile Include="..\..\..\..\src\config\parser.cpp" />
     <ClCompile Include="..\..\..\..\src\config\path.cpp" />
     <ClCompile Include="..\..\..\..\src\config\point.cpp">
       <ObjectFileName>$(IntDir)src_config_point.obj</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\src\config\printer.cpp" />
     <ClCompile Include="..\..\..\..\src\config\script.cpp">
       <ObjectFileName>$(IntDir)src_config_script.obj</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\src\config\setting.cpp" />
     <ClCompile Include="..\..\..\..\src\config\transaction.cpp">
       <ObjectFileName>$(IntDir)src_config_transaction.obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="..\..\..\..\src\config\url.cpp" />
     <ClCompile Include="..\..\..\..\src\config\utilities.cpp" />
     <ClCompile Include="..\..\..\..\src\config\version.cpp" />
-    <ClCompile Include="..\..\..\..\src\crypto\aes256.cpp" />
+    <ClCompile Include="..\..\..\..\src\config\witness.cpp">
+      <ObjectFileName>$(IntDir)src_config_witness.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\crypto\aes_gcm.cpp" />
     <ClCompile Include="..\..\..\..\src\crypto\chacha20.cpp" />
     <ClCompile Include="..\..\..\..\src\crypto\chacha20_poly1305.cpp" />
     <ClCompile Include="..\..\..\..\src\crypto\der_parser.cpp" />
@@ -253,36 +267,98 @@
     <ClCompile Include="..\..\..\..\src\crypto\maybe_random.cpp" />
     <ClCompile Include="..\..\..\..\src\crypto\poly1305.cpp" />
     <ClCompile Include="..\..\..\..\src\crypto\salsa20.cpp" />
-    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\batch.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\algorithm.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\batch\compact.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\batch\device.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\batch\ecdsa.cpp">
+      <ObjectFileName>$(IntDir)src_crypto_secp256k1_batch_ecdsa.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\batch\scan.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\batch\schnorr.cpp">
+      <ObjectFileName>$(IntDir)src_crypto_secp256k1_batch_schnorr.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\batch\silent.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\batch\verify.cpp">
+      <ObjectFileName>$(IntDir)src_crypto_secp256k1_batch_verify.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\cuda\driver.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\cuda\ptx.cpp" />
     <ClCompile Include="..\..\..\..\src\crypto\secp256k1\ec_context.cpp" />
-    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\ecdsa.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\ecdsa.cpp">
+      <ObjectFileName>$(IntDir)src_crypto_secp256k1_ecdsa.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\src\crypto\secp256k1\ellswift.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\comb_00.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\comb_01.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\comb_02.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\slice_00.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\slice_01.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\slice_02.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\slice_03.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\slice_04.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\slice_05.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\slice_06.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\slice_07.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\slice_08.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\slice_09.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\slice_10.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\slice_11.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\slice_12.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\slice_13.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\slice_14.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\generator\slice_15.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\interface.cpp" />
     <ClCompile Include="..\..\..\..\src\crypto\secp256k1\keys.cpp" />
     <ClCompile Include="..\..\..\..\src\crypto\secp256k1\math.cpp">
       <ObjectFileName>$(IntDir)src_crypto_secp256k1_math.obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="..\..\..\..\src\crypto\secp256k1\recover.cpp" />
-    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\schnorr.cpp" />
+    <ClCompile Include="..\..\..\..\src\crypto\secp256k1\schnorr.cpp">
+      <ObjectFileName>$(IntDir)src_crypto_secp256k1_schnorr.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\crypto\shamir\rs1024.cpp" />
     <ClCompile Include="..\..\..\..\src\crypto\x25519.cpp" />
     <ClCompile Include="..\..\..\..\src\crypto\xsalsa20_poly1305.cpp" />
     <ClCompile Include="..\..\..\..\src\data\data_chunk.cpp" />
+    <ClCompile Include="..\..\..\..\src\data\memory.cpp" />
     <ClCompile Include="..\..\..\..\src\data\string.cpp" />
     <ClCompile Include="..\..\..\..\src\define.cpp" />
     <ClCompile Include="..\..\..\..\src\endian\endian.cpp" />
     <ClCompile Include="..\..\..\..\src\error\block_error_t.cpp" />
     <ClCompile Include="..\..\..\..\src\error\error_t.cpp" />
     <ClCompile Include="..\..\..\..\src\error\errorno_t.cpp" />
+    <ClCompile Include="..\..\..\..\src\error\json_error_t.cpp" />
     <ClCompile Include="..\..\..\..\src\error\op_error_t.cpp" />
     <ClCompile Include="..\..\..\..\src\error\script_error_t.cpp" />
     <ClCompile Include="..\..\..\..\src\error\transaction_error_t.cpp" />
+    <ClCompile Include="..\..\..\..\src\error\x509_error_t.cpp" />
+    <ClCompile Include="..\..\..\..\src\execution.cpp" />
     <ClCompile Include="..\..\..\..\src\filter\golomb.cpp" />
     <ClCompile Include="..\..\..\..\src\hash\accumulator.cpp" />
+    <ClCompile Include="..\..\..\..\src\hash\adler32.cpp" />
     <ClCompile Include="..\..\..\..\src\hash\checksum.cpp" />
+    <ClCompile Include="..\..\..\..\src\hash\crc32.cpp" />
     <ClCompile Include="..\..\..\..\src\hash\muhash.cpp" />
     <ClCompile Include="..\..\..\..\src\hash\siphash.cpp" />
+    <ClCompile Include="..\..\..\..\src\ip\address.cpp" />
+    <ClCompile Include="..\..\..\..\src\ip\endpoint.cpp">
+      <ObjectFileName>$(IntDir)src_ip_endpoint.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\ip\functions.cpp" />
+    <ClCompile Include="..\..\..\..\src\ip\ipv4.cpp" />
+    <ClCompile Include="..\..\..\..\src\ip\ipv6.cpp" />
     <ClCompile Include="..\..\..\..\src\math\math.cpp">
       <ObjectFileName>$(IntDir)src_math_math.obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\src\options\description.cpp" />
+    <ClCompile Include="..\..\..\..\src\options\parameter.cpp" />
+    <ClCompile Include="..\..\..\..\src\options\parser.cpp">
+      <ObjectFileName>$(IntDir)src_options_parser.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\options\parsers.cpp" />
+    <ClCompile Include="..\..\..\..\src\options\printer.cpp" />
+    <ClCompile Include="..\..\..\..\src\options\setting.cpp" />
+    <ClCompile Include="..\..\..\..\src\options\variables.cpp" />
     <ClCompile Include="..\..\..\..\src\radix\base_10.cpp" />
     <ClCompile Include="..\..\..\..\src\radix\base_2048.cpp" />
     <ClCompile Include="..\..\..\..\src\radix\base_32.cpp" />
@@ -290,6 +366,14 @@
     <ClCompile Include="..\..\..\..\src\radix\base_58.cpp" />
     <ClCompile Include="..\..\..\..\src\radix\base_64.cpp" />
     <ClCompile Include="..\..\..\..\src\radix\base_85.cpp" />
+    <ClCompile Include="..\..\..\..\src\serial\json\array.cpp" />
+    <ClCompile Include="..\..\..\..\src\serial\json\object.cpp" />
+    <ClCompile Include="..\..\..\..\src\serial\json\parser.cpp">
+      <ObjectFileName>$(IntDir)src_serial_json_parser.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\src\serial\json\serializer.cpp" />
+    <ClCompile Include="..\..\..\..\src\serial\json\value.cpp" />
+    <ClCompile Include="..\..\..\..\src\serial\json\value_ref.cpp" />
     <ClCompile Include="..\..\..\..\src\serial\props.cpp" />
     <ClCompile Include="..\..\..\..\src\settings.cpp" />
     <ClCompile Include="..\..\..\..\src\stream\binary.cpp" />
@@ -309,16 +393,11 @@
     <ClCompile Include="..\..\..\..\src\unicode\utf8_everywhere\unicode_streambuf.cpp" />
     <ClCompile Include="..\..\..\..\src\wallet\addresses\bitcoin_uri.cpp" />
     <ClCompile Include="..\..\..\..\src\wallet\addresses\payment_address.cpp" />
+    <ClCompile Include="..\..\..\..\src\wallet\addresses\png.cpp" />
     <ClCompile Include="..\..\..\..\src\wallet\addresses\qr_code.cpp" />
-    <ClCompile Include="..\..\..\..\src\wallet\addresses\qrencode\bitstream.c" />
-    <ClCompile Include="..\..\..\..\src\wallet\addresses\qrencode\mask.c" />
-    <ClCompile Include="..\..\..\..\src\wallet\addresses\qrencode\mmask.c" />
-    <ClCompile Include="..\..\..\..\src\wallet\addresses\qrencode\mqrspec.c" />
-    <ClCompile Include="..\..\..\..\src\wallet\addresses\qrencode\qrencode.c" />
-    <ClCompile Include="..\..\..\..\src\wallet\addresses\qrencode\qrinput.c" />
-    <ClCompile Include="..\..\..\..\src\wallet\addresses\qrencode\qrspec.c" />
-    <ClCompile Include="..\..\..\..\src\wallet\addresses\qrencode\rsecc.c" />
-    <ClCompile Include="..\..\..\..\src\wallet\addresses\qrencode\split.c" />
+    <ClCompile Include="..\..\..\..\src\wallet\addresses\qr_encoder.cpp" />
+    <ClCompile Include="..\..\..\..\src\wallet\addresses\qr_matrix.cpp" />
+    <ClCompile Include="..\..\..\..\src\wallet\addresses\silent_payment.cpp" />
     <ClCompile Include="..\..\..\..\src\wallet\addresses\tiff.cpp" />
     <ClCompile Include="..\..\..\..\src\wallet\addresses\uri.cpp" />
     <ClCompile Include="..\..\..\..\src\wallet\addresses\witness_address.cpp" />
@@ -350,6 +429,9 @@
     <ClCompile Include="..\..\..\..\src\wallet\mnemonics\mnemonic.cpp">
       <ObjectFileName>$(IntDir)src_wallet_mnemonics_mnemonic.obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\src\wallet\mnemonics\slip39.cpp">
+      <ObjectFileName>$(IntDir)src_wallet_mnemonics_slip39.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\src\wallet\neutrino.cpp" />
     <ClCompile Include="..\..\..\..\src\wallet\point_value.cpp" />
     <ClCompile Include="..\..\..\..\src\wallet\points_value.cpp" />
@@ -372,18 +454,29 @@
     <ClCompile Include="..\..\..\..\src\words\catalogs\mnemonic.cpp">
       <ObjectFileName>$(IntDir)src_words_catalogs_mnemonic.obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\src\words\catalogs\slip39.cpp">
+      <ObjectFileName>$(IntDir)src_words_catalogs_slip39.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\src\words\languages.cpp" />
+    <ClCompile Include="..\..\..\..\src\x509\builder.cpp" />
+    <ClCompile Include="..\..\..\..\src\x509\certificate.cpp" />
+    <ClCompile Include="..\..\..\..\src\x509\der.cpp" />
+    <ClCompile Include="..\..\..\..\src\x509\pem.cpp" />
+    <ClCompile Include="..\..\..\..\src\x509\private_key.cpp" />
+    <ClCompile Include="..\..\..\..\src\x509\verify.cpp">
+      <ObjectFileName>$(IntDir)src_x509_verify.obj</ObjectFileName>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\..\builds\msvc\resource.h" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\allocator.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\arena.hpp" />
-    <ClInclude Include="..\..\..\..\include\bitcoin\system\boost.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\annex.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\batch\batch.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\batch\cursor.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\batch\ecdsa_signatures.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\batch\multisig.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\batch\schnorr_signatures.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\batch\signatures.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\batch\threshold.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\block.hpp" />
@@ -425,13 +518,22 @@
     <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\point.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\prevout.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\script.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\short_id.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\signet.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\stripper.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\taproot.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\tapscript.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\transaction.hpp" />
-    <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\views\block_view.hpp" />
-    <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\views\transaction_view.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\view\block.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\view\input.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\view\output.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\view\transaction.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\chain\witness.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\compression\compression.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\compression\deflate.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\compression\gzip.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\compression\inflate.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\compression\zlib.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\config\authority.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\config\base16.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\config\base2.hpp" />
@@ -449,20 +551,23 @@
     <ClInclude Include="..\..\..\..\include\bitcoin\system\config\header.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\config\input.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\config\output.hpp" />
-    <ClInclude Include="..\..\..\..\include\bitcoin\system\config\parameter.hpp" />
-    <ClInclude Include="..\..\..\..\include\bitcoin\system\config\parser.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\config\path.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\config\point.hpp" />
-    <ClInclude Include="..\..\..\..\include\bitcoin\system\config\printer.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\config\script.hpp" />
-    <ClInclude Include="..\..\..\..\include\bitcoin\system\config\setting.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\config\selection.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\config\token.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\config\transaction.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\config\url.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\config\utilities.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\config\version.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\config\witness.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\constants.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\constraints.hpp" />
-    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\aes256.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\aes\aes.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\aes\algorithm.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\aes\ghash.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\aes_gcm.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\algorithms.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\chacha20.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\chacha20_poly1305.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\crypto.hpp" />
@@ -470,10 +575,24 @@
     <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\fschacha20.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\fschacha20_poly1305.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\maybe_random.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\nist\algorithm.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\nist\nist.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\poly1305.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\salsa20.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\secp256k1.hpp" />
-    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\secp256k1_batch.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\secp256k1\algorithm.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\secp256k1\batch\batch.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\secp256k1\batch\compact.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\secp256k1\batch\device.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\secp256k1\batch\ecdsa.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\secp256k1\batch\scan.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\secp256k1\batch\schnorr.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\secp256k1\batch\silent.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\secp256k1\batch\verify.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\secp256k1\tables.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\shamir\algorithm.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\shamir\rs1024.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\shamir\shamir.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\x25519.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\crypto\xsalsa20_poly1305.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\data\array_cast.hpp" />
@@ -507,22 +626,27 @@
     <ClInclude Include="..\..\..\..\include\bitcoin\system\error\error.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\error\error_t.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\error\errorno_t.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\error\json_error_t.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\error\macros.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\error\op_error_t.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\error\script_error_t.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\error\transaction_error_t.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\error\x509_error_t.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\exceptions.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\execution.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\filter\bloom.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\filter\bloom_array.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\filter\filter.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\filter\golomb.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\filter\sieve.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\forks.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\funclets.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\hash\accumulator.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\hash\adler32.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\hash\algorithm.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\hash\algorithms.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\hash\checksum.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\hash\crc32.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\hash\functions.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\hash\hash.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\hash\hkdf.hpp" />
@@ -543,23 +667,38 @@
     <ClInclude Include="..\..\..\..\include\bitcoin\system\hash\sha3\sha3.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\hash\siphash.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\have.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\add.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\byte_swap.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\count.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\cpuid.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\detection.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\intel\intel.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\intel\intel_128.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\intel\intel_256.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\intel\intel_512.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\intel\intel_aes.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\intel\intel_crc.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\intel\intel_sha.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\intrinsics.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\multiply.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\neon\neon.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\neon\neon_128.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\neon\neon_aes.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\neon\neon_crc.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\neon\neon_sha.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\none\none_128.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\none\none_aes.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\none\none_crc.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\none\none_sha.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\rotate.hpp" />
-    <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\sve\sve.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\tags.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\intrinsics\types.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\ip\address.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\ip\endpoint.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\ip\functions.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\ip\ip.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\ip\ipv4.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\ip\ipv6.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\literals.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\machine\interpreter.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\machine\machine.hpp" />
@@ -584,6 +723,17 @@
     <ClInclude Include="..\..\..\..\include\bitcoin\system\math\power.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\math\rotate.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\math\sign.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\options\description.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\options\options.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\options\parameter.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\options\parser.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\options\parsers.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\options\printer.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\options\setting.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\options\value.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\options\variables.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\pool\algorithm.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\pool\pool.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\preprocessor.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\radix\base_10.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\radix\base_16.hpp" />
@@ -596,6 +746,11 @@
     <ClInclude Include="..\..\..\..\include\bitcoin\system\radix\base_85.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\radix\radix.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\serial\deserialize.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\serial\json\conversion.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\serial\json\json.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\serial\json\parser.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\serial\json\serializer.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\serial\json\value.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\serial\props.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\serial\serial.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\serial\serialize.hpp" />
@@ -634,6 +789,8 @@
     <ClInclude Include="..\..\..\..\include\bitcoin\system\stream\streams.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\typelets.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\types.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\uintx\uintx.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\uintx\uintx_t.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\unicode\ascii.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\unicode\code_points.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\unicode\conversion.hpp" />
@@ -650,11 +807,22 @@
     <ClInclude Include="..\..\..\..\include\bitcoin\system\unicode\utf8_everywhere\unicode_ostream.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\unicode\utf8_everywhere\unicode_streambuf.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\unicode\utf8_everywhere\utf8_everywhere.hpp" />
-    <ClInclude Include="..\..\..\..\include\bitcoin\system\version.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\unit_test\checks.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\unit_test\filter.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\unit_test\macros.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\unit_test\registry.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\unit_test\runner.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\unit_test\session.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\unit_test\settings.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\unit_test\unit_test.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\wallet\addresses\bitcoin_uri.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\wallet\addresses\checked.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\wallet\addresses\payment_address.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\wallet\addresses\png.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\wallet\addresses\qr_code.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\wallet\addresses\qr_encoder.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\wallet\addresses\qr_matrix.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\wallet\addresses\silent_payment.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\wallet\addresses\tiff.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\wallet\addresses\uri.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\wallet\addresses\uri_reader.hpp" />
@@ -676,6 +844,7 @@
     <ClInclude Include="..\..\..\..\include\bitcoin\system\wallet\mnemonics\electrum.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\wallet\mnemonics\electrum_v1.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\wallet\mnemonics\mnemonic.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\wallet\mnemonics\slip39.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\wallet\neutrino.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\wallet\point_value.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\wallet\points_value.hpp" />
@@ -688,24 +857,34 @@
     <ClInclude Include="..\..\..\..\include\bitcoin\system\words\catalogs\electrum.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\words\catalogs\electrum_v1.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\words\catalogs\mnemonic.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\words\catalogs\slip39.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\words\dictionaries.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\words\dictionary.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\words\language.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\words\languages.hpp" />
     <ClInclude Include="..\..\..\..\include\bitcoin\system\words\words.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\x509\builder.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\x509\certificate.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\x509\der.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\x509\oids.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\x509\pem.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\x509\private_key.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\x509\verify.hpp" />
+    <ClInclude Include="..\..\..\..\include\bitcoin\system\x509\x509.hpp" />
+    <ClInclude Include="..\..\..\..\src\compression\framing.hpp" />
+    <ClInclude Include="..\..\..\..\src\compression\rfc1951.hpp" />
+    <ClInclude Include="..\..\..\..\src\crypto\secp256k1\batch\batch.hpp" />
+    <ClInclude Include="..\..\..\..\src\crypto\secp256k1\cuda\context.hpp" />
+    <ClInclude Include="..\..\..\..\src\crypto\secp256k1\cuda\driver.hpp" />
+    <ClInclude Include="..\..\..\..\src\crypto\secp256k1\cuda\kernels.hpp" />
+    <ClInclude Include="..\..\..\..\src\crypto\secp256k1\cuda\layout.hpp" />
+    <ClInclude Include="..\..\..\..\src\crypto\secp256k1\cuda\library.hpp" />
+    <ClInclude Include="..\..\..\..\src\crypto\secp256k1\cuda\ptx.hpp" />
+    <ClInclude Include="..\..\..\..\src\crypto\secp256k1\cuda\turns.hpp" />
     <ClInclude Include="..\..\..\..\src\crypto\secp256k1\ec_context.hpp" />
+    <ClInclude Include="..\..\..\..\src\crypto\secp256k1\generator\generator.hpp" />
+    <ClInclude Include="..\..\..\..\src\crypto\secp256k1\interface.hpp" />
     <ClInclude Include="..\..\..\..\src\crypto\secp256k1\serialize.hpp" />
-    <ClInclude Include="..\..\..\..\src\wallet\addresses\qrencode\bitstream.h" />
-    <ClInclude Include="..\..\..\..\src\wallet\addresses\qrencode\license.h" />
-    <ClInclude Include="..\..\..\..\src\wallet\addresses\qrencode\mask.h" />
-    <ClInclude Include="..\..\..\..\src\wallet\addresses\qrencode\mmask.h" />
-    <ClInclude Include="..\..\..\..\src\wallet\addresses\qrencode\mqrspec.h" />
-    <ClInclude Include="..\..\..\..\src\wallet\addresses\qrencode\qrencode.h" />
-    <ClInclude Include="..\..\..\..\src\wallet\addresses\qrencode\qrencode_inner.h" />
-    <ClInclude Include="..\..\..\..\src\wallet\addresses\qrencode\qrinput.h" />
-    <ClInclude Include="..\..\..\..\src\wallet\addresses\qrencode\qrspec.h" />
-    <ClInclude Include="..\..\..\..\src\wallet\addresses\qrencode\rsecc.h" />
-    <ClInclude Include="..\..\..\..\src\wallet\addresses\qrencode\split.h" />
     <ClInclude Include="..\..\..\..\src\wallet\keys\parse_encrypted_keys\parse_encrypted_key.hpp" />
     <ClInclude Include="..\..\..\..\src\wallet\keys\parse_encrypted_keys\parse_encrypted_prefix.hpp" />
     <ClInclude Include="..\..\..\..\src\wallet\keys\parse_encrypted_keys\parse_encrypted_private.hpp" />
@@ -720,7 +899,36 @@
     <None Include="..\..\..\..\include\bitcoin\system\impl\chain\tapscript.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\chain\transaction_patterns.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\chain\witness_patterns.ipp" />
-    <None Include="..\..\..\..\include\bitcoin\system\impl\config\setting.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\config\token.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\aes\algorithm_bitslice.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\aes\algorithm_ctr.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\aes\algorithm_native.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\aes\algorithm_rounds.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\aes\algorithm_schedule.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\aes\algorithm_single.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\aes\ghash.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\aes_gcm.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\nist\algorithm_der.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\nist\algorithm_ecdsa.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\nist\algorithm_keys.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\nist\algorithm_limbs.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\nist\algorithm_modular.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\nist\algorithm_multiply.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\nist\algorithm_points.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\secp256k1\algorithm_batch.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\secp256k1\algorithm_ellswift.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\secp256k1\algorithm_field.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\secp256k1\algorithm_group.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\secp256k1\algorithm_inversion.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\secp256k1\algorithm_multiply.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\secp256k1\algorithm_pippenger.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\secp256k1\algorithm_scalar.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\secp256k1\algorithm_sign.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\secp256k1\algorithm_table.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\secp256k1\algorithm_verify.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\shamir\algorithm_cipher.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\shamir\algorithm_field.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\crypto\shamir\algorithm_shares.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\data\array_cast.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\data\byte_cast.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\data\collection.ipp" />
@@ -740,6 +948,7 @@
     <None Include="..\..\..\..\include\bitcoin\system\impl\endian\uintx_t.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\endian\unsafe.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\filter\bloom.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\filter\bloom_array.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\filter\sieve.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\hash\accumulator.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\hash\checksum.ipp" />
@@ -794,10 +1003,15 @@
     <None Include="..\..\..\..\include\bitcoin\system\impl\math\power.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\math\rotate.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\math\sign.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\options\setting.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\options\value.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\pool\algorithm.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\radix\base_16.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\radix\base_2n.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\radix\base_58.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\serial\deserialize.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\serial\json\conversion.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\serial\json\value.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\serial\serialize.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\stream\device.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\stream\iostream\iostream.ipp" />
@@ -812,45 +1026,37 @@
     <None Include="..\..\..\..\include\bitcoin\system\impl\stream\streamers\sha256_writer.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\stream\streamers\sha256t_writer.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\stream\streamers\sha256x2_writer.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\uintx\arithmetic.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\uintx\bitwise.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\uintx\compare.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\uintx\construct.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\uintx\division.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\uintx\text.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\unicode\ascii.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\unit_test\checks.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\unit_test\filter.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\unit_test\registry.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\unit_test\runner.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\unit_test\session.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\impl\unit_test\settings.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\wallet\addresses\checked.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\words\dictionaries.ipp" />
     <None Include="..\..\..\..\include\bitcoin\system\impl\words\dictionary.ipp" />
+    <None Include="..\..\..\..\include\bitcoin\system\version.hpp.in" />
     <None Include="..\..\..\..\src\wallet\keys\parse_encrypted_keys\parse_encrypted_key.ipp" />
     <None Include="..\..\..\..\src\wallet\keys\parse_encrypted_keys\parse_encrypted_prefix.ipp" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="..\..\..\..\builds\msvc\resource.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
   <ImportGroup Label="ExtensionSettings">
-    <Import Project="$(NuGetPackageRoot)UltrafastSecp256k1-vc145.4.5.0.3\build\native\UltrafastSecp256k1-vc145.targets" Condition="Exists('$(NuGetPackageRoot)UltrafastSecp256k1-vc145.4.5.0.3\build\native\UltrafastSecp256k1-vc145.targets')" />
-    <Import Project="$(NuGetPackageRoot)libbitcoin-boost.1.91.0\build\libbitcoin-boost.targets" Condition="Exists('$(NuGetPackageRoot)libbitcoin-boost.1.91.0\build\libbitcoin-boost.targets')" />
-    <Import Project="$(NuGetPackageRoot)libbitcoin-boost_container-vc145.1.91.0\build\libbitcoin-boost_container-vc145.targets" Condition="Exists('$(NuGetPackageRoot)libbitcoin-boost_container-vc145.1.91.0\build\libbitcoin-boost_container-vc145.targets')" />
-    <Import Project="$(NuGetPackageRoot)libbitcoin-boost_iostreams-vc145.1.91.0\build\libbitcoin-boost_iostreams-vc145.targets" Condition="Exists('$(NuGetPackageRoot)libbitcoin-boost_iostreams-vc145.1.91.0\build\libbitcoin-boost_iostreams-vc145.targets')" />
-    <Import Project="$(NuGetPackageRoot)libbitcoin-boost_json-vc145.1.91.0\build\libbitcoin-boost_json-vc145.targets" Condition="Exists('$(NuGetPackageRoot)libbitcoin-boost_json-vc145.1.91.0\build\libbitcoin-boost_json-vc145.targets')" />
-    <Import Project="$(NuGetPackageRoot)libbitcoin-boost_locale-vc145.1.91.0\build\libbitcoin-boost_locale-vc145.targets" Condition="Exists('$(NuGetPackageRoot)libbitcoin-boost_locale-vc145.1.91.0\build\libbitcoin-boost_locale-vc145.targets')" />
-    <Import Project="$(NuGetPackageRoot)libbitcoin-boost_program_options-vc145.1.91.0\build\libbitcoin-boost_program_options-vc145.targets" Condition="Exists('$(NuGetPackageRoot)libbitcoin-boost_program_options-vc145.1.91.0\build\libbitcoin-boost_program_options-vc145.targets')" />
-    <Import Project="$(NuGetPackageRoot)libbitcoin-boost_thread-vc145.1.91.0\build\libbitcoin-boost_thread-vc145.targets" Condition="Exists('$(NuGetPackageRoot)libbitcoin-boost_thread-vc145.1.91.0\build\libbitcoin-boost_thread-vc145.targets')" />
-    <Import Project="$(NuGetPackageRoot)libbitcoin-boost_url-vc145.1.91.0\build\libbitcoin-boost_url-vc145.targets" Condition="Exists('$(NuGetPackageRoot)libbitcoin-boost_url-vc145.1.91.0\build\libbitcoin-boost_url-vc145.targets')" />
-    <Import Project="$(NuGetPackageRoot)secp256k1_vc145.0.8.0\build\native\secp256k1_vc145.targets" Condition="Exists('$(NuGetPackageRoot)secp256k1_vc145.0.8.0\build\native\secp256k1_vc145.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Enable NuGet Package Restore to download them. For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The Missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('$(NuGetPackageRoot)libbitcoin-boost.1.91.0\build\libbitcoin-boost.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)libbitcoin-boost.1.91.0\build\libbitcoin-boost.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)libbitcoin-boost_container-vc145.1.91.0\build\libbitcoin-boost_container-vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)libbitcoin-boost_container-vc145.1.91.0\build\libbitcoin-boost_container-vc145.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)libbitcoin-boost_iostreams-vc145.1.91.0\build\libbitcoin-boost_iostreams-vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)libbitcoin-boost_iostreams-vc145.1.91.0\build\libbitcoin-boost_iostreams-vc145.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)libbitcoin-boost_json-vc145.1.91.0\build\libbitcoin-boost_json-vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)libbitcoin-boost_json-vc145.1.91.0\build\libbitcoin-boost_json-vc145.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)libbitcoin-boost_locale-vc145.1.91.0\build\libbitcoin-boost_locale-vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)libbitcoin-boost_locale-vc145.1.91.0\build\libbitcoin-boost_locale-vc145.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)libbitcoin-boost_program_options-vc145.1.91.0\build\libbitcoin-boost_program_options-vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)libbitcoin-boost_program_options-vc145.1.91.0\build\libbitcoin-boost_program_options-vc145.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)libbitcoin-boost_thread-vc145.1.91.0\build\libbitcoin-boost_thread-vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)libbitcoin-boost_thread-vc145.1.91.0\build\libbitcoin-boost_thread-vc145.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)libbitcoin-boost_url-vc145.1.91.0\build\libbitcoin-boost_url-vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)libbitcoin-boost_url-vc145.1.91.0\build\libbitcoin-boost_url-vc145.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)secp256k1_vc145.0.8.0\build\native\secp256k1_vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)secp256k1_vc145.0.8.0\build\native\secp256k1_vc145.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)UltrafastSecp256k1-vc145.4.5.0.3\build\native\UltrafastSecp256k1-vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)UltrafastSecp256k1-vc145.4.5.0.3\build\native\UltrafastSecp256k1-vc145.targets'))" />
   </Target>
   <ItemGroup>
     <Natvis Include="..\..\debug.natvis" />

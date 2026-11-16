@@ -42,7 +42,7 @@
 /// learn.microsoft.com/en-us/cpp/c-runtime-library/
 /// find-memory-leaks-using-the-crt-library
 /// _CRTDBG_MAP_ALLOC must be prior to the includes, so defined in props.
-#if defined(HAVE_MSC) && defined(_DEBUG) && defined(_CRTDBG_MAP_ALLOC)
+#if defined(HAVE_WINDOWS) && defined(_DEBUG) && defined(_CRTDBG_MAP_ALLOC)
     #include <stdlib.h>
     #include <crtdbg.h>
     ////_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -125,18 +125,54 @@
     #define BC_INTERNAL BC_HELPER_DLL_LOCAL
 #endif
 
+/// Applies api to an explicit instantiation definition (NX exports by declaration).
+#if defined(HAVE_WINDOWS_LIBS)
+    #define BC_INSTANCE(api) api
+#else
+    #define BC_INSTANCE(api)
+#endif
+
 /// Inlines.
 /// ---------------------------------------------------------------------------
 
 /// A stronger compiler hint for inlining.
 /// May use prior to 'constexpr' or in place of 'inline'.
 /// Disable msc/x32 due to high level of rejection (warning volume).
-#if defined(HAVE_MSC) && !defined(HAVE_X32)
+#if defined(HAVE_MSC) && !defined(HAVE_X32) && defined(NDEBUG)
     #define INLINE __forceinline
 #elif defined(HAVE_GNUC) || defined(HAVE_CLANG)
     #define INLINE __attribute__((always_inline)) inline
 #else
     #define INLINE inline
+#endif
+
+/// Baseline code generation.
+/// ---------------------------------------------------------------------------
+
+/// Compile a function for the base instruction set of its architecture.
+/// msc does not support per function instruction set selection.
+#if (defined(HAVE_GNUC) || defined(HAVE_CLANG)) && defined(HAVE_X64)
+    #define BASELINE __attribute__((target("arch=x86-64," \
+        "no-sse3,no-ssse3,no-sse4.1,no-sse4.2,no-popcnt,no-avx,no-avx2," \
+        "no-avx512f,no-fma,no-f16c,no-bmi,no-bmi2,no-lzcnt,no-movbe," \
+        "no-sha,no-aes,no-pclmul")))
+#elif (defined(HAVE_GNUC) || defined(HAVE_CLANG)) && defined(HAVE_ARM64)
+    #define BASELINE __attribute__((target("arch=armv8-a")))
+#else
+    #define BASELINE
+#endif
+
+/// Device compilation.
+/// ---------------------------------------------------------------------------
+
+/// Function callable from both host and device code.
+/// Variable resident in device memory.
+#if defined(HAVE_PTX)
+    #define HOST_DEVICE __attribute__((host, device))
+    #define DEVICE __attribute__((device))
+#else
+    #define HOST_DEVICE
+    #define DEVICE
 #endif
 
 /// Class helpers.
@@ -195,10 +231,6 @@
     #define _ARM_USE_NEW_NEON_INTRINSICS
 #endif
 
-#if defined(HAVE_MSC) && (_WIN32_WINNT >= 0x0602)
-    #define HAVE_MEMORY_PRIORITY
-#endif
-
 /// Workarounds for C++ noncompliance.
 /// ---------------------------------------------------------------------------
 
@@ -214,15 +246,5 @@
 
 /// C++17 (full)
 #define FALLTHROUGH [[fallthrough]]
-
-/// C++17 (partial)
-/// None on xcode.
-/// Requires link with -ltbb on gcc (v9).
-/// Experimental on clang (libcxx.llvm.org/Status/PSTL.html), requires:
-/// -fexperimental-library
-/// using poolstl, do not include <execution>.
-#include <bitcoin/system/execution.hpp>
-
-/// C++20 (full)
 
 #endif

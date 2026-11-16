@@ -176,8 +176,8 @@ INLINE void chacha20::transpose(rows_t<xWord>& row) NOEXCEPT
     constexpr auto size = lanes<xWord>;
 
     // Interleave adjacent rows by 32 and then by 64 bit words.
-    rows_t<xWord> t{};
-    rows_t<xWord> u{};
+    aligned_array<xWord, lanes<xWord>> t{};
+    aligned_array<xWord, lanes<xWord>> u{};
 
     if constexpr (size == 4)
     {
@@ -216,7 +216,7 @@ INLINE void chacha20::transpose(rows_t<xWord>& row) NOEXCEPT
         interleave64<2>(u, t);
         interleave64<3>(u, t);
 
-        rows_t<xWord> v{};
+        aligned_array<xWord, lanes<xWord>> v{};
         exchange<0, 4>(v, u);
         exchange<1, 4>(v, u);
         exchange<2, 4>(v, u);
@@ -268,14 +268,19 @@ INLINE void chacha20::sequence(state_t<xWord>& keystream,
     constexpr auto part = parts<xWord>;
     constexpr auto lane = lanes<xWord>;
 
+    const auto little = [](xWord word) NOEXCEPT
+    {
+        return native_to_little_end<uint32_t>(word);
+    };
+
     if constexpr (part > 0)
-        keystream[part * Lane + 0] = x[lane * 0 + Lane];
+        keystream[part * Lane + 0] = little(x[lane * 0 + Lane]);
     if constexpr (part > 1)
-        keystream[part * Lane + 1] = x[lane * 1 + Lane];
+        keystream[part * Lane + 1] = little(x[lane * 1 + Lane]);
     if constexpr (part > 2)
-        keystream[part * Lane + 2] = x[lane * 2 + Lane];
+        keystream[part * Lane + 2] = little(x[lane * 2 + Lane]);
     if constexpr (part > 3)
-        keystream[part * Lane + 3] = x[lane * 3 + Lane];
+        keystream[part * Lane + 3] = little(x[lane * 3 + Lane]);
 }
 
 // Generates lanes sequential keystream blocks.
@@ -378,11 +383,18 @@ chacha20::chacha20(const secret& key) NOEXCEPT
     set_key(key);
 }
 
+chacha20::~chacha20() NOEXCEPT
+{
+    wipe(key_);
+    wipe(nonce_);
+    wipe(buffer_);
+}
+
 void chacha20::set_key(const secret& key) NOEXCEPT
 {
     // The next eight words (4-11) are taken from the 256-bit key by reading
     // the bytes in little-endian order, in 4-byte chunks.
-    from_little_endians(key_, array_cast<uint32_t>(key));
+    from_little_endians(key_, key);
     nonce_ = {};
     counter_ = {};
     offset_ = block_size;
@@ -413,7 +425,7 @@ void chacha20::next(block& out) NOEXCEPT
     rounds(x);
 
     // Serialize by sequencing the words one-by-one in little-endian order.
-    to_little_endians(array_cast<uint32_t>(out), x);
+    to_little_endians(out, x);
     ++counter_;
 }
 

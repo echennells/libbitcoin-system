@@ -41,7 +41,10 @@ public:
     typedef data_array<block_size> block;
 
     /// Initialize at nonce {0, 0}, block counter zero.
+    DEFAULT_COPY_MOVE(chacha20);
+
     chacha20(const secret& key) NOEXCEPT;
+    ~chacha20() NOEXCEPT;
 
     /// Rekey, invalidating buffered keystream (seek to reposition).
     void set_key(const secret& key) NOEXCEPT;
@@ -63,7 +66,7 @@ protected:
     typedef std_array<uint32_t, 3> nonce_t;
 
     template <typename Word>
-    using state_t = std_array<Word, state_words>;
+    using state_t = aligned_array<Word, state_words>;
 
     /// The number of concurrent blocks computed by an extended word.
     template <typename xWord>

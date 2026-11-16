@@ -33,6 +33,67 @@ namespace system {
 // Golomb-coded set construction
 // ----------------------------------------------------------------------------
 
+template <typename Items>
+static std::vector<uint64_t> hash_distinct_(const Items& items,
+    const siphash_key& entropy) NOEXCEPT
+{
+    using indexed = std::pair<uint64_t, size_t>;
+    std::vector<indexed> hashes(items.size());
+    for (size_t index = 0; index < items.size(); ++index)
+        hashes.at(index) = { siphash(entropy, items.at(index)), index };
+
+    sort(hashes);
+
+    // Items of equal hash are retained unless also equal in value.
+    std::vector<uint64_t> out{};
+    out.reserve(hashes.size());
+    auto run = hashes.cbegin();
+    for (auto it = hashes.cbegin(); it != hashes.cend(); ++it)
+    {
+        if (it->first != run->first)
+            run = it;
+
+        const auto equal = [&](const indexed& other) NOEXCEPT
+        {
+            return items.at(other.second) == items.at(it->second);
+        };
+
+        if (std::none_of(run, it, equal))
+            out.push_back(it->first);
+    }
+
+    return out;
+}
+
+std::vector<uint64_t> golomb::hash_distinct(const data_stack& items,
+    const siphash_key& entropy) NOEXCEPT
+{
+    return hash_distinct_(items, entropy);
+}
+
+std::vector<uint64_t> golomb::hash_distinct(
+    const std::vector<data_slice>& items, const siphash_key& entropy) NOEXCEPT
+{
+    return hash_distinct_(items, entropy);
+}
+
+void golomb::construct(bitwriter& writer, const std::vector<uint64_t>& hashes,
+    uint8_t bits, uint64_t target_false_positive_rate) NOEXCEPT
+{
+    const uint64_t count = hashes.size();
+    if (is_multiply_overflow(target_false_positive_rate, count))
+        return;
+
+    const auto bound = target_false_positive_rate * count;
+    uint64_t previous = 0;
+    for (const auto hash: hashes)
+    {
+        const auto value = to_range(hash, bound);
+        encode(writer, value - previous, bits);
+        previous = value;
+    }
+}
+
 // protected
 void golomb::construct(bitwriter& writer, const data_stack& items, uint8_t bits,
     const siphash_key& entropy, uint64_t target_false_positive_rate) NOEXCEPT
@@ -129,13 +190,13 @@ bool golomb::match_stack(bitreader& source, const data_stack& targets,
         target_false_positive_rate, entropy);
 
     uint64_t range = 0;
-    auto it = set.begin();
+    auto it = set.cbegin();
 
-    for (uint64_t index = 0; index < set_size && it != set.end(); ++index)
+    for (uint64_t index = 0; index < set_size && it != set.cend(); ++index)
     {
         range += decode(source, bits);
 
-        for (auto value = *it; it != set.end(); value = *(it++))
+        for (auto value = *it; it != set.cend(); value = *(it++))
         {
             if (value == range)
                 return true;
@@ -172,11 +233,17 @@ bool golomb::match_stack(const data_chunk& compressed_set,
 void golomb::encode(bitwriter& writer, uint64_t value,
     uint8_t modulo_exponent) NOEXCEPT
 {
-    const auto quotient = shift_right(value, modulo_exponent);
-    for (uint64_t index = 0; index < quotient; ++index)
-        writer.write_bit(true);
+    // The quotient is unary (ones terminated by a zero), the remainder binary.
+    auto quotient = shift_right(value, modulo_exponent);
+    while (quotient >= bits<uint64_t>)
+    {
+        writer.write_bits(max_uint64, bits<uint64_t>);
+        quotient -= bits<uint64_t>;
+    }
 
-    writer.write_bit(false);
+    const auto count = possible_narrow_cast<size_t>(quotient);
+    const auto ones = unmask_right<uint64_t>(count);
+    writer.write_bits(shift_left(ones, one), add1(count));
     writer.write_bits(value, modulo_exponent);
 }
 
@@ -190,12 +257,17 @@ uint64_t golomb::decode(bitreader& reader, uint8_t modulo_exponent) NOEXCEPT
     return shift_left(quotient, modulo_exponent) + remainder;
 }
 
+uint64_t golomb::to_range(uint64_t hash, uint64_t bound) NOEXCEPT
+{
+    constexpr auto shift = bits<uint64_t>;
+    const auto product = uint128_t(hash) * uint128_t(bound);
+    return (product >> shift).convert_to<uint64_t>();
+}
+
 uint64_t golomb::hash_to_range(const data_slice& item, uint64_t bound,
     const siphash_key& key) NOEXCEPT
 {
-    constexpr auto shift = bits<uint64_t>;
-    const auto product = uint128_t(siphash(key, item)) * uint128_t(bound);
-    return (product >> shift).convert_to<uint64_t>();
+    return to_range(siphash(key, item), bound);
 }
 
 std::vector<uint64_t> golomb::hashed_set_construct(const data_stack& items,
@@ -207,7 +279,7 @@ std::vector<uint64_t> golomb::hashed_set_construct(const data_stack& items,
 
     std::vector<uint64_t> hashes(items.size());
     const auto bound = target_false_positive_rate * set_size;
-    std::transform(items.begin(), items.end(), hashes.begin(),
+    std::transform(items.cbegin(), items.cend(), hashes.begin(),
         [&](const data_chunk& item) NOEXCEPT
         {
             return hash_to_range(item, bound, key);

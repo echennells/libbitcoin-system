@@ -50,7 +50,6 @@ constexpr size_t max_number_size_five = 5;
 /// Validation consensus constants.
 /// ---------------------------------------------------------------------------
 
-constexpr size_t hash_limit = 4500;
 constexpr size_t min_coinbase_size = 2;
 constexpr size_t max_coinbase_size = 100;
 constexpr size_t coinbase_maturity = 100;
@@ -60,6 +59,8 @@ constexpr size_t max_block_size = 1'000'000;
 constexpr size_t max_sigops_factor = 50;
 constexpr size_t max_block_sigops = max_block_size / max_sigops_factor;
 constexpr size_t max_timewarp = 600;
+constexpr size_t max_timewarp_bip54 = 2 * 60 * 60;
+constexpr size_t invalid_transaction_size = 64;
 constexpr uint64_t satoshi_per_bitcoin = 100'000'000;
 
 /// Relative locktime consensus constants.
@@ -76,6 +77,7 @@ constexpr size_t relative_locktime_mask_left = 16;
 
 constexpr size_t heavy_sigops_factor = 4;
 constexpr size_t max_fast_sigops = heavy_sigops_factor * max_block_sigops;
+constexpr size_t max_prevout_sigops = 2'500;
 constexpr size_t light_weight_factor = 4;
 constexpr size_t max_block_weight = light_weight_factor * max_block_size;
 constexpr size_t base_size_contribution = 3;
@@ -95,6 +97,11 @@ constexpr uint8_t taproot_annex_prefix = 0x50;
 constexpr uint8_t tapscript_mask = 0b1111'1110; // 0xfe
 constexpr uint8_t tapscript_version = 0b1100'0000; // 0xc0
 
+/// Signet consensus constants [bip325].
+/// ---------------------------------------------------------------------------
+
+constexpr uint32_t signet_head = 0xecc7daa2;
+
 /// Policy constants.
 /// ---------------------------------------------------------------------------
 
@@ -105,6 +112,9 @@ constexpr size_t max_null_data_size = 80;
 
 /// Applies to block.txs, tx.inputs/witnesses, and tx.outputs.
 constexpr auto max_count = max_block_size;
+
+/// Applies to block.txs (one input and one output, both scripts empty).
+constexpr size_t min_transaction_size = 60;
 
 /// Applies to input.witness (stack size), script, 
 constexpr auto max_bytes = max_block_weight;

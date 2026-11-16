@@ -37,12 +37,16 @@
 #include <bitcoin/system/chain/point.hpp>
 #include <bitcoin/system/chain/prevout.hpp>
 #include <bitcoin/system/chain/script.hpp>
+#include <bitcoin/system/chain/short_id.hpp>
+#include <bitcoin/system/chain/signet.hpp>
 #include <bitcoin/system/chain/stripper.hpp>
 #include <bitcoin/system/chain/taproot.hpp>
 #include <bitcoin/system/chain/tapscript.hpp>
 #include <bitcoin/system/chain/transaction.hpp>
-#include <bitcoin/system/chain/views/block_view.hpp>
-#include <bitcoin/system/chain/views/transaction_view.hpp>
+#include <bitcoin/system/chain/view/block.hpp>
+#include <bitcoin/system/chain/view/input.hpp>
+#include <bitcoin/system/chain/view/output.hpp>
+#include <bitcoin/system/chain/view/transaction.hpp>
 #include <bitcoin/system/chain/witness.hpp>
 
 // Byte copy cost is computed as ceilinged divide of total member bits by 8 (128 bits per shared_ptr).

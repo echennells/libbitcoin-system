@@ -20,6 +20,7 @@
 #define LIBBITCOIN_SYSTEM_INTRINSICS_NEON_128_HPP
 
 #include <bitcoin/system/define.hpp>
+#include <bitcoin/system/intrinsics/count.hpp>
 #include <bitcoin/system/intrinsics/types.hpp>
 #include <bitcoin/system/intrinsics/neon/neon.hpp>
 
@@ -127,6 +128,19 @@ INLINE xint128_t add(xint128_t a, xint128_t b) NOEXCEPT
         return (xint128_t)vaddq_u64((uint64x2_t)a, (uint64x2_t)b);
 }
 
+template <auto S>
+INLINE xint128_t sub(xint128_t a, xint128_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint8_t>)
+        return (xint128_t)vsubq_u8((uint8x16_t)a, (uint8x16_t)b);
+    if constexpr (S == bits<uint16_t>)
+        return (xint128_t)vsubq_u16((uint16x8_t)a, (uint16x8_t)b);
+    if constexpr (S == bits<uint32_t>)
+        return (xint128_t)vsubq_u32((uint32x4_t)a, (uint32x4_t)b);
+    if constexpr (S == bits<uint64_t>)
+        return (xint128_t)vsubq_u64((uint64x2_t)a, (uint64x2_t)b);
+}
+
 template <auto K, auto S>
 INLINE xint128_t addc(xint128_t a) NOEXCEPT
 {
@@ -159,6 +173,33 @@ INLINE xint128_t mul(xint128_t a, xint128_t b) NOEXCEPT
     if constexpr (S == bits<uint64_t>)
         return (xint128_t)vmull_u32(vmovn_u64((uint64x2_t)a),
             vmovn_u64((uint64x2_t)b));
+}
+
+template <auto S>
+INLINE xint128_t min(xint128_t a, xint128_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint8_t>)
+        return (xint128_t)vminq_u8((uint8x16_t)a, (uint8x16_t)b);
+    if constexpr (S == bits<uint16_t>)
+        return (xint128_t)vminq_u16((uint16x8_t)a, (uint16x8_t)b);
+    if constexpr (S == bits<uint32_t>)
+        return vminq_u32(a, b);
+}
+
+template <auto S>
+INLINE xint128_t madd52lo(xint128_t c, xint128_t a, xint128_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint64_t>)
+        return (xint128_t)vmadd52loq_u64((uint64x2_t)c, (uint64x2_t)a,
+            (uint64x2_t)b);
+}
+
+template <auto S>
+INLINE xint128_t madd52hi(xint128_t c, xint128_t a, xint128_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint64_t>)
+        return (xint128_t)vmadd52hiq_u64((uint64x2_t)c, (uint64x2_t)a,
+            (uint64x2_t)b);
 }
 
 /// broadcast/get/set
@@ -275,29 +316,189 @@ INLINE xint128_t byteswap(xint128_t a) NOEXCEPT
     return (xint128_t)vrev64q_u8((uint8x16_t)a);
 }
 
-/// load/store
+/// load/store (lanes of Integral from casted, bytes from pointer)
 /// ---------------------------------------------------------------------------
 
+template <typename Integral = uint32_t, if_same<Integral, uint8_t> = true>
 INLINE xint128_t load(const xint128_t& bytes) NOEXCEPT
 {
-    return vld1q_u32((uint32_t*)&bytes);
+    return (xint128_t)vld1q_u8((const uint8_t*)&bytes);
 }
 
+template <typename Integral = uint32_t, if_same<Integral, uint16_t> = true>
+INLINE xint128_t load(const xint128_t& bytes) NOEXCEPT
+{
+    return (xint128_t)vld1q_u16((const uint16_t*)&bytes);
+}
+
+template <typename Integral = uint32_t, if_same<Integral, uint32_t> = true>
+INLINE xint128_t load(const xint128_t& bytes) NOEXCEPT
+{
+    return vld1q_u32((const uint32_t*)&bytes);
+}
+
+template <typename Integral = uint32_t, if_same<Integral, uint64_t> = true>
+INLINE xint128_t load(const xint128_t& bytes) NOEXCEPT
+{
+    return (xint128_t)vld1q_u64((const uint64_t*)&bytes);
+}
+
+template <typename Integral = uint32_t, if_same<Integral, uint8_t> = true>
+INLINE void store(xint128_t& bytes, xint128_t a) NOEXCEPT
+{
+    vst1q_u8((uint8_t*)&bytes, (uint8x16_t)a);
+}
+
+template <typename Integral = uint32_t, if_same<Integral, uint16_t> = true>
+INLINE void store(xint128_t& bytes, xint128_t a) NOEXCEPT
+{
+    vst1q_u16((uint16_t*)&bytes, (uint16x8_t)a);
+}
+
+template <typename Integral = uint32_t, if_same<Integral, uint32_t> = true>
 INLINE void store(xint128_t& bytes, xint128_t a) NOEXCEPT
 {
     vst1q_u32((uint32_t*)&bytes, a);
 }
 
-INLINE xint128_t load_aligned(const xint128_t& bytes) NOEXCEPT
+template <typename Integral = uint32_t, if_same<Integral, uint64_t> = true>
+INLINE void store(xint128_t& bytes, xint128_t a) NOEXCEPT
 {
-    return vld1q_u32((uint32_t*)&bytes);
+    vst1q_u64((uint64_t*)&bytes, (uint64x2_t)a);
 }
 
+template <typename xWord, if_same<xWord, xint128_t> = true>
+INLINE xint128_t load(const uint8_t* bytes) NOEXCEPT
+{
+    return (xint128_t)vld1q_u8(bytes);
+}
+
+INLINE void store(uint8_t* bytes, xint128_t a) NOEXCEPT
+{
+    vst1q_u8(bytes, (uint8x16_t)a);
+}
+
+template <typename Integral = uint32_t, if_same<Integral, uint8_t> = true>
+INLINE xint128_t load_aligned(const xint128_t& bytes) NOEXCEPT
+{
+    return (xint128_t)vld1q_u8((const uint8_t*)&bytes);
+}
+
+template <typename Integral = uint32_t, if_same<Integral, uint16_t> = true>
+INLINE xint128_t load_aligned(const xint128_t& bytes) NOEXCEPT
+{
+    return (xint128_t)vld1q_u16((const uint16_t*)&bytes);
+}
+
+template <typename Integral = uint32_t, if_same<Integral, uint32_t> = true>
+INLINE xint128_t load_aligned(const xint128_t& bytes) NOEXCEPT
+{
+    return vld1q_u32((const uint32_t*)&bytes);
+}
+
+template <typename Integral = uint32_t, if_same<Integral, uint64_t> = true>
+INLINE xint128_t load_aligned(const xint128_t& bytes) NOEXCEPT
+{
+    return (xint128_t)vld1q_u64((const uint64_t*)&bytes);
+}
+
+template <typename Integral = uint32_t, if_same<Integral, uint8_t> = true>
+INLINE void store_aligned(xint128_t& bytes, xint128_t a) NOEXCEPT
+{
+    vst1q_u8((uint8_t*)&bytes, (uint8x16_t)a);
+}
+
+template <typename Integral = uint32_t, if_same<Integral, uint16_t> = true>
+INLINE void store_aligned(xint128_t& bytes, xint128_t a) NOEXCEPT
+{
+    vst1q_u16((uint16_t*)&bytes, (uint16x8_t)a);
+}
+
+template <typename Integral = uint32_t, if_same<Integral, uint32_t> = true>
 INLINE void store_aligned(xint128_t& bytes, xint128_t a) NOEXCEPT
 {
     vst1q_u32((uint32_t*)&bytes, a);
 }
 
+template <typename Integral = uint32_t, if_same<Integral, uint64_t> = true>
+INLINE void store_aligned(xint128_t& bytes, xint128_t a) NOEXCEPT
+{
+    vst1q_u64((uint64_t*)&bytes, (uint64x2_t)a);
+}
+
+/// compare/select
+/// ---------------------------------------------------------------------------
+/// Masks are all bits set (true) or unset (false) per word.
+
+INLINE xint128_t andnot(xint128_t a, xint128_t b) NOEXCEPT
+{
+    return vbicq_u32(b, a);
+}
+
+template <auto S>
+INLINE xint128_t eq(xint128_t a, xint128_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint8_t>)
+        return (xint128_t)vceqq_u8((uint8x16_t)a, (uint8x16_t)b);
+    if constexpr (S == bits<uint16_t>)
+        return (xint128_t)vceqq_u16((uint16x8_t)a, (uint16x8_t)b);
+    if constexpr (S == bits<uint32_t>)
+        return vceqq_u32(a, b);
+    if constexpr (S == bits<uint64_t>)
+    {
+        // A 64 bit word is equal iff both of its 32 bit words are equal.
+        const auto words = vceqq_u32(a, b);
+        return vandq_u32(words, vrev64q_u32(words));
+    }
+}
+
+INLINE xint128_t select(xint128_t mask, xint128_t a, xint128_t b) NOEXCEPT
+{
+    return vbslq_u32(mask, a, b);
+}
+
+INLINE bool any(xint128_t a) NOEXCEPT
+{
+    const auto halves = vorr_u32(vget_low_u32(a), vget_high_u32(a));
+    return !is_zero(vget_lane_u32(vpmax_u32(halves, halves), 0));
+}
+
+// The index of the first unequal byte, or the word size if equal.
+// Each byte of the comparison narrows to a four bit nibble of the mask.
+INLINE size_t first_unequal(xint128_t a, xint128_t b) NOEXCEPT
+{
+    constexpr auto nibble = to_half(byte_bits);
+    const auto equal = vceqq_u8(vreinterpretq_u8_u32(a),
+        vreinterpretq_u8_u32(b));
+    const auto narrowed = vshrn_n_u16(vreinterpretq_u16_u8(vmvnq_u8(equal)),
+        nibble);
+    const auto unequal = vget_lane_u64(vreinterpret_u64_u8(narrowed), 0);
+    return is_zero(unequal) ? sizeof(xint128_t) :
+        sign_cast<size_t>(count_right_zeros(unequal)) / nibble;
+}
+
+/// gather
+/// ---------------------------------------------------------------------------
+
+INLINE xint128_t gather(const uint64_t* table, xint128_t index) NOEXCEPT
+{
+    BC_PUSH_WARNING(NO_POINTER_ARITHMETIC)
+    return set<xint128_t>(
+        table[possible_narrow_cast<size_t>(get<uint64_t, 0>(index))],
+        table[possible_narrow_cast<size_t>(get<uint64_t, 1>(index))]);
+    BC_POP_WARNING()
+}
+
+INLINE xint128_t gather(const uint32_t* table, xint128_t index) NOEXCEPT
+{
+    BC_PUSH_WARNING(NO_POINTER_ARITHMETIC)
+    return set<xint128_t>(
+        table[possible_narrow_cast<size_t>(get<uint32_t, 0>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 1>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 2>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 3>(index))]);
+    BC_POP_WARNING()
+}
 
 /// interleave (for matrix transposition)
 /// ---------------------------------------------------------------------------
@@ -306,26 +507,28 @@ template <auto S>
 INLINE xint128_t unpack_lo(xint128_t a, xint128_t b) NOEXCEPT
 {
     if constexpr (S == bits<uint8_t>)
-        return (xint128_t)vzip1q_u8((uint8x16_t)a, (uint8x16_t)b);
+        return (xint128_t)vzipq_u8((uint8x16_t)a, (uint8x16_t)b).val[0];
     if constexpr (S == bits<uint16_t>)
-        return (xint128_t)vzip1q_u16((uint16x8_t)a, (uint16x8_t)b);
+        return (xint128_t)vzipq_u16((uint16x8_t)a, (uint16x8_t)b).val[0];
     if constexpr (S == bits<uint32_t>)
-        return (xint128_t)vzip1q_u32((uint32x4_t)a, (uint32x4_t)b);
+        return (xint128_t)vzipq_u32((uint32x4_t)a, (uint32x4_t)b).val[0];
     if constexpr (S == bits<uint64_t>)
-        return (xint128_t)vzip1q_u64((uint64x2_t)a, (uint64x2_t)b);
+        return (xint128_t)vcombine_u64(vget_low_u64((uint64x2_t)a),
+            vget_low_u64((uint64x2_t)b));
 }
 
 template <auto S>
 INLINE xint128_t unpack_hi(xint128_t a, xint128_t b) NOEXCEPT
 {
     if constexpr (S == bits<uint8_t>)
-        return (xint128_t)vzip2q_u8((uint8x16_t)a, (uint8x16_t)b);
+        return (xint128_t)vzipq_u8((uint8x16_t)a, (uint8x16_t)b).val[1];
     if constexpr (S == bits<uint16_t>)
-        return (xint128_t)vzip2q_u16((uint16x8_t)a, (uint16x8_t)b);
+        return (xint128_t)vzipq_u16((uint16x8_t)a, (uint16x8_t)b).val[1];
     if constexpr (S == bits<uint32_t>)
-        return (xint128_t)vzip2q_u32((uint32x4_t)a, (uint32x4_t)b);
+        return (xint128_t)vzipq_u32((uint32x4_t)a, (uint32x4_t)b).val[1];
     if constexpr (S == bits<uint64_t>)
-        return (xint128_t)vzip2q_u64((uint64x2_t)a, (uint64x2_t)b);
+        return (xint128_t)vcombine_u64(vget_high_u64((uint64x2_t)a),
+            vget_high_u64((uint64x2_t)b));
 }
 
 INLINE xint128_t tile_lo(xint128_t a, xint128_t) NOEXCEPT

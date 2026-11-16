@@ -53,7 +53,8 @@ static constexpr size_t ec_ellswift_size = 64;
 typedef data_array<ec_ellswift_size> ec_ellswift;
 typedef std_vector<ec_ellswift> ec_ellswifts;
 
-// Parsed ECDSA or Schnorr signature:
+// Parsed ECDSA signature (r then s, each as four native 64 bit words, least
+// significant first) or BIP340 Schnorr signature:
 static constexpr size_t ec_signature_size = 64;
 typedef data_array<ec_signature_size> ec_signature;
 typedef std_vector<ec_signature> ec_signatures;
@@ -98,6 +99,9 @@ struct BC_API recoverable_signature
     uint8_t recovery_id;
 };
 
+/// Name and version of the linked secp256k1 library, or "internal".
+BC_API std::string secp256k1_library() NOEXCEPT;
+
 /// Add EC values
 /// ---------------------------------------------------------------------------
 
@@ -115,6 +119,10 @@ BC_API bool ec_add(ec_compressed& left, const ec_compressed& right) NOEXCEPT;
 
 /// Compute the sum a += b.
 BC_API bool ec_add(ec_compressed& left, const ec_uncompressed& right) NOEXCEPT;
+
+/// Compute the sum a += b.
+BC_API bool ec_add(ec_uncompressed& left,
+    const ec_uncompressed& right) NOEXCEPT;
 
 /// Compute the sum of compressed point values.
 BC_API bool ec_sum(ec_compressed& out, const ec_compresseds& values) NOEXCEPT;
@@ -184,6 +192,9 @@ BC_API bool is_compressed_key(const data_slice& point) NOEXCEPT;
 
 /// Fast detection of uncompressed public key structure.
 BC_API bool is_uncompressed_key(const data_slice& point) NOEXCEPT;
+
+/// Fast detection of hybrid public key structure.
+BC_API bool is_hybrid_key(const data_slice& point) NOEXCEPT;
 
 /// Fast detection of compressed or uncompressed public key structure.
 BC_API bool is_public_key(const data_slice& point) NOEXCEPT;

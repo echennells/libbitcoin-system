@@ -1,0 +1,54 @@
+///////////////////////////////////////////////////////////////////////////////
+// Copyright (c) 2014-2026 libbitcoin-system developers (see COPYING).
+//
+//        GENERATED SOURCE CODE, DO NOT EDIT EXCEPT EXPERIMENTALLY
+//
+///////////////////////////////////////////////////////////////////////////////
+#ifndef LIBBITCOIN_SYSTEM_VERSION_HPP
+#define LIBBITCOIN_SYSTEM_VERSION_HPP
+
+/**
+ * The version of this repository as: [major].[minor]
+ * For interpretation of the versioning scheme see: http://semver.org
+ */
+
+#define LIBBITCOIN_SYSTEM_VERSION       "@LIBBITCOIN_VERSION_MAJOR@.@LIBBITCOIN_VERSION_MINOR@"
+#define LIBBITCOIN_SYSTEM_MAJOR_VERSION @LIBBITCOIN_VERSION_MAJOR@
+#define LIBBITCOIN_SYSTEM_MINOR_VERSION @LIBBITCOIN_VERSION_MINOR@
+
+#ifndef RC_INVOKED
+
+#include <string_view>
+
+#if defined(BC_STATIC)
+    #define LIBBITCOIN_SYSTEM_VERSION_API
+#elif defined(_MSC_VER) || defined(__CYGWIN__)
+    #if defined(BC_DLL)
+        #define LIBBITCOIN_SYSTEM_VERSION_API __declspec(dllexport)
+    #else
+        #define LIBBITCOIN_SYSTEM_VERSION_API __declspec(dllimport)
+    #endif
+#else
+    #define LIBBITCOIN_SYSTEM_VERSION_API __attribute__((visibility("default")))
+#endif
+
+namespace libbitcoin {
+namespace system {
+
+/// The version of a build, as [major].[minor].[patch] with its git state.
+struct build_version_t
+{
+    std::string_view semantic;
+    std::string_view commit_hash;
+    bool dirty;
+};
+
+/// The version of this build.
+LIBBITCOIN_SYSTEM_VERSION_API const build_version_t& build_version() noexcept;
+
+} // namespace system
+} // namespace libbitcoin
+
+#endif
+
+#endif

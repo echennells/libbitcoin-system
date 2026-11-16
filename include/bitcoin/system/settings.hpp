@@ -37,6 +37,9 @@ public:
     settings() NOEXCEPT;
     settings(chain::selection context) NOEXCEPT;
 
+    /// Derive the network of the genesis block (const thereafter).
+    virtual void initialize() NOEXCEPT;
+
     /// Computed properties.
     /// -----------------------------------------------------------------------
 
@@ -57,6 +60,15 @@ public:
     virtual uint32_t maximum_timespan() const NOEXCEPT;
     virtual uint32_t retargeting_interval() const NOEXCEPT;
 
+    /// Network.
+    /// -----------------------------------------------------------------------
+
+    /// The network of the defaults.
+    config::selection network{};
+
+    /// The network of the genesis block, none if not that of a network.
+    chain::selection genesis_network{};
+
     /// Configured forks.
     /// -----------------------------------------------------------------------
     /// These are used by chain_state (only).
@@ -72,6 +84,7 @@ public:
     uint32_t timestamp_limit_seconds;
     chain::checkpoints checkpoints{};
     config::block genesis_block{};
+    config::script signet_challenge{};
 
     /// These are used by chain_state (only).
     uint32_t retargeting_factor;
@@ -108,17 +121,16 @@ public:
     size_t bip90_bip65_height{};
     size_t bip90_bip66_height{};
 
-    size_t bip30_reactivate_height{};
-    chain::checkpoint bip30_deactivate_checkpoint{};
-
-    /// This cannot be reactivated in a future branch due to window expiration.
-    chain::checkpoint bip9_bit0_active_checkpoint{};
-
-    /// This cannot be reactivated in a future branch due to window expiration.
-    chain::checkpoint bip9_bit1_active_checkpoint{};
-
-    /// This cannot be reactivated in a future branch due to window expiration.
-    chain::checkpoint bip9_bit2_active_checkpoint{};
+    /// Activation parameters (bip9-style activations).
+    size_t bip9_activation_period{};
+    chain::chain_state::deployment bip9_bit0_deployment{};
+    chain::chain_state::deployment bip9_bit1_deployment{};
+    chain::chain_state::deployment bip9_bit2_deployment{};
+    chain::chain_state::deployment bip54_timewarp_deployment{};
+    chain::chain_state::deployment bip54_timespan_deployment{};
+    chain::chain_state::deployment bip54_sigops_deployment{};
+    chain::chain_state::deployment bip54_txsize_deployment{};
+    chain::chain_state::deployment bip54_coinbase_deployment{};
 
     /// A block that is presumed to be valid but not required to be present.
     chain::checkpoint milestone{};

@@ -21,6 +21,7 @@
 
 #include <bitcoin/system/data/data.hpp>
 #include <bitcoin/system/define.hpp>
+#include <bitcoin/system/options/options.hpp>
 #include <bitcoin/system/unicode/unicode.hpp>
 
 namespace libbitcoin {
@@ -45,21 +46,23 @@ public:
     /// The key as a base85 encoded (z85) string.
     std::string to_string() const;
 
-    friend std::istream& operator>>(std::istream& stream,
+    friend BC_API std::istream& operator>>(std::istream& stream,
         base85& argument) THROWS;
-    friend std::ostream& operator<<(std::ostream& stream,
+    friend BC_API std::ostream& operator<<(std::ostream& stream,
         const base85& argument);
 
 private:
     data_chunk value_;
 };
 
-/// Assign the token as the key, bypassing stream extraction, which cannot
-/// obtain an empty token (the unencrypted default).
-BC_API void validate(boost::any& value, const string_list& tokens, base85*,
-    int) THROWS;
-
 } // namespace config
+
+namespace options {
+
+template <>
+struct is_whole_token_t<config::base85> : std::true_type {};
+
+} // namespace options
 } // namespace system
 } // namespace libbitcoin
 

@@ -21,9 +21,11 @@
 
 // algorithms is a group include for /sha and /rmd.
 #include <bitcoin/system/hash/accumulator.hpp>
+#include <bitcoin/system/hash/adler32.hpp>
 #include <bitcoin/system/hash/algorithm.hpp>
 #include <bitcoin/system/hash/algorithms.hpp>
 #include <bitcoin/system/hash/checksum.hpp>
+#include <bitcoin/system/hash/crc32.hpp>
 #include <bitcoin/system/hash/functions.hpp>
 #include <bitcoin/system/hash/hkdf.hpp>
 #include <bitcoin/system/hash/hmac.hpp>

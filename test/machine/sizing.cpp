@@ -22,7 +22,7 @@
 // ----------------------------------------------------------------------------
 
 // stdlib object sizes are subjsct to implementation (including debug builds).
-#if defined(HAVE_MSC) && defined(NDEBUG)
+#if defined(HAVE_MSVC_STL) && defined(NDEBUG)
 
 // Must add1 when using pmr std_vector.
 constexpr auto pmr(auto value) NOEXCEPT
@@ -62,19 +62,19 @@ constexpr auto pmr32(auto value) NOEXCEPT
 
 // std::variant<bool, int64_t, std_vector<uint8_t>> object reference requires 4 pointers (max element + 1).
 constexpr auto a4 = sizeof(std::variant<bool, int64_t, std_vector<uint8_t>*>);
-constexpr auto c4 = sizeof(std::variant<bool, int64_t, std_vector<uint8_t>>);
+////constexpr auto c4 = sizeof(std::variant<bool, int64_t, std_vector<uint8_t>>);
 static_assert(a4 == 2 * sizeof(int64_t));
 ////static_assert(c4 == 2 * sizeof(size_t) + pmr32(2) * sizeof(int64_t));
 
 // std_vector<std::variant<bool, int64_t, std_vector<uint8_t>>> does not increase this (per element) cost.
 constexpr auto a5 = sizeof(std_vector<std::variant<bool, int64_t, std_vector<uint8_t>*>>::value_type);
-constexpr auto c5 = sizeof(std_vector<std::variant<bool, int64_t, std_vector<uint8_t>>>::value_type);
+////constexpr auto c5 = sizeof(std_vector<std::variant<bool, int64_t, std_vector<uint8_t>>>::value_type);
 static_assert(a5 == 2 * sizeof(int64_t));
 ////static_assert(c5 == 2 * sizeof(size_t) + pmr32(2) * sizeof(int64_t));
 
 // std_vector<std::variant<bool, int64_t, std_vector<uint8_t>>> requires 3 pointers (singular cost).
-constexpr auto a6 = sizeof(std_vector<std::variant<bool, int64_t, std_vector<uint8_t>*>>);
-constexpr auto c6 = sizeof(std_vector<std::variant<bool, int64_t, std_vector<uint8_t>>>);
+////constexpr auto a6 = sizeof(std_vector<std::variant<bool, int64_t, std_vector<uint8_t>*>>);
+////constexpr auto c6 = sizeof(std_vector<std::variant<bool, int64_t, std_vector<uint8_t>>>);
 ////static_assert(a6 == pmr(3) * sizeof(size_t));
 ////static_assert(c6 == pmr(3) * sizeof(size_t));
 
@@ -97,7 +97,7 @@ static_assert(a8 == 2 * sizeof(size_t) + 1 * sizeof(int64_t));
 // could be made a requirement of the caller to retain the passed-by-reference objects in scope.
 constexpr auto a9 = sizeof(std::variant<bool, int64_t, std_vector<uint8_t>*>);
 constexpr auto c9 = sizeof(std::variant<bool, int64_t, std::shared_ptr<std_vector<uint8_t>>>);
-constexpr auto d9 = sizeof(std::variant<bool, int64_t, std_vector<uint8_t>>);
+////constexpr auto d9 = sizeof(std::variant<bool, int64_t, std_vector<uint8_t>>);
 static_assert(a9 == 2 * sizeof(int64_t));
 static_assert(c9 == 2 * sizeof(size_t) + 1 * sizeof(int64_t));
 ////static_assert(d9 == 2 * sizeof(size_t) + pmr32(2) * sizeof(int64_t));
@@ -119,7 +119,7 @@ static_assert(a11 == 2 * sizeof(int64_t));
 constexpr auto a0 = sizeof(std::weak_ptr<data_chunk>);
 static_assert(a0 == 2 * sizeof(size_t));
 
-#endif // HAVE_MSC && NDEBUG
+#endif // HAVE_MSVC_STL && NDEBUG
 
 // copy/move restrictions of unique_ptr:
 ////auto foo()

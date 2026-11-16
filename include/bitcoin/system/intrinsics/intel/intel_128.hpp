@@ -20,10 +20,11 @@
 #define LIBBITCOIN_SYSTEM_INTRINSICS_INTEL_128_HPP
 
 #include <bitcoin/system/define.hpp>
+#include <bitcoin/system/intrinsics/count.hpp>
 #include <bitcoin/system/intrinsics/types.hpp>
 #include <bitcoin/system/intrinsics/intel/intel.hpp>
 
-#if defined(HAVE_SSE4)
+#if defined(HAVE_SSE41)
 
 namespace libbitcoin {
 namespace system {
@@ -131,6 +132,20 @@ INLINE xint128_t add(xint128_t a, xint128_t b) NOEXCEPT
 }
 
 // SSE2
+template <auto S>
+INLINE xint128_t sub(xint128_t a, xint128_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint8_t>)
+        return _mm_sub_epi8(a, b);
+    if constexpr (S == bits<uint16_t>)
+        return _mm_sub_epi16(a, b);
+    if constexpr (S == bits<uint32_t>)
+        return _mm_sub_epi32(a, b);
+    if constexpr (S == bits<uint64_t>)
+        return _mm_sub_epi64(a, b);
+}
+
+// SSE2
 template <auto K, auto S>
 INLINE xint128_t addc(xint128_t a) NOEXCEPT
 {
@@ -166,6 +181,34 @@ INLINE xint128_t mul(xint128_t a, xint128_t b) NOEXCEPT
         return _mm_mul_epu32(a, b);
 }
 
+// SSE4.1
+template <auto S>
+INLINE xint128_t min(xint128_t a, xint128_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint8_t>)
+        return _mm_min_epu8(a, b);
+    if constexpr (S == bits<uint16_t>)
+        return _mm_min_epu16(a, b);
+    if constexpr (S == bits<uint32_t>)
+        return _mm_min_epu32(a, b);
+}
+
+// AVX512IFMA+AVX512VL or AVXIFMA (SSE2)
+template <auto S>
+INLINE xint128_t madd52lo(xint128_t c, xint128_t a, xint128_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint64_t>)
+        return mm_madd52lo_epu64(c, a, b);
+}
+
+// AVX512IFMA+AVX512VL or AVXIFMA (SSE2)
+template <auto S>
+INLINE xint128_t madd52hi(xint128_t c, xint128_t a, xint128_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint64_t>)
+        return mm_madd52hi_epu64(c, a, b);
+}
+
 /// broadcast/get/get/set
 /// ---------------------------------------------------------------------------
 
@@ -183,6 +226,12 @@ INLINE xint128_t broadcast(Word a) NOEXCEPT
         return _mm_set1_epi32(a);
     if constexpr (is_same_type<Word, uint64_t>)
         return _mm_set1_epi64x(a);
+}
+
+template <typename xWord, if_same<xWord, xint128_t> = true>
+INLINE xint128_t broadcast(xint128_t a) NOEXCEPT
+{
+    return a;
 }
 
 // SSE4.1
@@ -273,29 +322,116 @@ INLINE xint128_t byteswap(xint128_t a) NOEXCEPT
         7, 6, 5, 4, 3, 2, 1, 0, 15, 14, 13, 12, 11, 10, 9, 8));
 }
 
-/// load/store (from casted to loaded/stored)
+/// load/store (lanes of Integral from casted, bytes from pointer)
 /// ---------------------------------------------------------------------------
 
+template <typename Integral = uint32_t, if_integral_integer<Integral> = true>
 INLINE xint128_t load(const xint128_t& bytes) NOEXCEPT
 {
     return _mm_loadu_si128(&bytes);
 }
 
+template <typename Integral = uint32_t, if_integral_integer<Integral> = true>
 INLINE void store(xint128_t& bytes, xint128_t a) NOEXCEPT
 {
     _mm_storeu_si128(&bytes, a);
 }
 
+template <typename xWord, if_same<xWord, xint128_t> = true>
+INLINE xint128_t load(const uint8_t* bytes) NOEXCEPT
+{
+    return _mm_loadu_si128(pointer_cast<const xint128_t>(bytes));
+}
+
+INLINE void store(uint8_t* bytes, xint128_t a) NOEXCEPT
+{
+    _mm_storeu_si128(pointer_cast<xint128_t>(bytes), a);
+}
+
+template <typename Integral = uint32_t, if_integral_integer<Integral> = true>
 INLINE xint128_t load_aligned(const xint128_t& bytes) NOEXCEPT
 {
     return _mm_load_si128(&bytes);
 }
 
+template <typename Integral = uint32_t, if_integral_integer<Integral> = true>
 INLINE void store_aligned(xint128_t& bytes, xint128_t a) NOEXCEPT
 {
     _mm_store_si128(&bytes, a);
 }
 
+/// compare/select
+/// ---------------------------------------------------------------------------
+/// Masks are all bits set (true) or unset (false) per word.
+
+// SSE2
+INLINE xint128_t andnot(xint128_t a, xint128_t b) NOEXCEPT
+{
+    return _mm_andnot_si128(a, b);
+}
+
+// SSE4.1
+template <auto S>
+INLINE xint128_t eq(xint128_t a, xint128_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint8_t>)
+        return _mm_cmpeq_epi8(a, b);
+    if constexpr (S == bits<uint16_t>)
+        return _mm_cmpeq_epi16(a, b);
+    if constexpr (S == bits<uint32_t>)
+        return _mm_cmpeq_epi32(a, b);
+    if constexpr (S == bits<uint64_t>)
+        return _mm_cmpeq_epi64(a, b);
+}
+
+// SSE4.1
+INLINE xint128_t select(xint128_t mask, xint128_t a, xint128_t b) NOEXCEPT
+{
+    return _mm_blendv_epi8(b, a, mask);
+}
+
+// SSE4.1
+INLINE bool any(xint128_t a) NOEXCEPT
+{
+    return is_zero(_mm_testz_si128(a, a));
+}
+
+// SSE2
+// The index of the first unequal byte, or the word size if equal.
+INLINE size_t first_unequal(xint128_t a, xint128_t b) NOEXCEPT
+{
+    const auto equal = _mm_movemask_epi8(_mm_cmpeq_epi8(a, b));
+    const auto unequal = bit_xor<uint32_t>(sign_cast<uint32_t>(equal),
+        max_uint16);
+
+    return is_zero(unequal) ? sizeof(xint128_t) :
+        sign_cast<size_t>(count_right_zeros(unequal));
+}
+
+/// gather
+/// ---------------------------------------------------------------------------
+
+// SSE4.1
+INLINE xint128_t gather(const uint64_t* table, xint128_t index) NOEXCEPT
+{
+    BC_PUSH_WARNING(NO_POINTER_ARITHMETIC)
+    return set<xint128_t>(
+        table[possible_narrow_cast<size_t>(get<uint64_t, 0>(index))],
+        table[possible_narrow_cast<size_t>(get<uint64_t, 1>(index))]);
+    BC_POP_WARNING()
+}
+
+// SSE4.1
+INLINE xint128_t gather(const uint32_t* table, xint128_t index) NOEXCEPT
+{
+    BC_PUSH_WARNING(NO_POINTER_ARITHMETIC)
+    return set<xint128_t>(
+        table[possible_narrow_cast<size_t>(get<uint32_t, 0>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 1>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 2>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 3>(index))]);
+    BC_POP_WARNING()
+}
 
 /// interleave (for matrix transposition)
 /// ---------------------------------------------------------------------------
@@ -342,6 +478,6 @@ INLINE xint128_t tile_hi(xint128_t, xint128_t b) NOEXCEPT
 } // namespace system
 } // namespace libbitcoin
 
-#endif // HAVE_SSE4
+#endif // HAVE_SSE41
 
 #endif

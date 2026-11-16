@@ -19,7 +19,6 @@
 #include <bitcoin/system/chain/block.hpp>
 
 #include <numeric>
-#include <ranges>
 #include <set>
 #include <bitcoin/system/chain/batch/signatures.hpp>
 #include <bitcoin/system/chain/context.hpp>
@@ -28,6 +27,7 @@
 #include <bitcoin/system/chain/enums/opcode.hpp>
 #include <bitcoin/system/chain/point.hpp>
 #include <bitcoin/system/chain/script.hpp>
+#include <bitcoin/system/chain/signet.hpp>
 #include <bitcoin/system/data/data.hpp>
 #include <bitcoin/system/define.hpp>
 #include <bitcoin/system/error/error.hpp>
@@ -135,7 +135,7 @@ block block::from_data(reader& source, bool witness) NOEXCEPT
         const auto count = source.read_size(max_count);
         txs->reserve(count);
 
-        for (size_t tx{}; tx < count; ++tx)
+        for (size_t tx{}; tx < count && source; ++tx)
             txs->push_back(to_shared<transaction>(source, witness));
 
         // This is a pointer copy (non-const to const).
@@ -207,10 +207,10 @@ const inputs_cptr block::inputs_ptr() const NOEXCEPT
     const auto append_ins = [&inputs](const auto& tx) NOEXCEPT
     {
         const auto& tx_ins = tx->inputs_ptr();
-        inputs->insert(inputs->end(), tx_ins->begin(), tx_ins->end());
+        inputs->insert(inputs->cend(), tx_ins->cbegin(), tx_ins->cend());
     };
 
-    std::for_each(txs_->begin(), txs_->end(), append_ins);
+    std::for_each(txs_->cbegin(), txs_->cend(), append_ins);
     return inputs;
 }
 
@@ -235,7 +235,7 @@ hashes block::transaction_hashes(bool witness) const NOEXCEPT
         return tx->hash(witness);
     };
 
-    std::transform(txs_->begin(), txs_->end(), out.begin(), hash);
+    std::transform(txs_->cbegin(), txs_->cend(), out.begin(), hash);
     return out;
 }
 
@@ -251,7 +251,7 @@ size_t block::outputs() const NOEXCEPT
          return ceilinged_add(total, tx->outputs());
     };
 
-    return std::accumulate(std::next(txs_->begin()), txs_->end(), zero, outs);
+    return std::accumulate(std::next(txs_->cbegin()), txs_->cend(), zero, outs);
 }
 
 // computed
@@ -267,7 +267,7 @@ size_t block::spends() const NOEXCEPT
     };
 
     // inputs() is add1(spends()) if the block is valid (one coinbase input).
-    return std::accumulate(std::next(txs_->begin()), txs_->end(), zero, ins);
+    return std::accumulate(std::next(txs_->cbegin()), txs_->cend(), zero, ins);
 }
 
 // computed
@@ -334,7 +334,7 @@ void block::set_state(const chain_state::cptr& state) const NOEXCEPT
 block::sizes block::serialized_size(const transaction_cptrs& txs) NOEXCEPT
 {
     sizes size{};
-    std::for_each(txs.begin(), txs.end(), [&](const auto& tx) NOEXCEPT
+    std::for_each(txs.cbegin(), txs.cend(), [&](const auto& tx) NOEXCEPT
     {
         size.nominal = ceilinged_add(size.nominal, tx->serialized_size(false));
         size.witnessed = ceilinged_add(size.witnessed,
@@ -388,7 +388,7 @@ bool block::is_extra_coinbases() const NOEXCEPT
         return tx->is_coinbase();
     };
 
-    return std::any_of(std::next(txs_->begin()), txs_->end(), value);
+    return std::any_of(std::next(txs_->cbegin()), txs_->cend(), value);
 }
 
 //*****************************************************************************
@@ -397,11 +397,20 @@ bool block::is_extra_coinbases() const NOEXCEPT
 //*****************************************************************************
 bool block::is_forward_reference() const NOEXCEPT
 {
-    if (txs_->empty())
+    return is_forward_reference(*txs_, true);
+}
+
+// static
+bool block::is_forward_reference(const transaction_cptrs& txs,
+    bool coinbase) NOEXCEPT
+{
+    if (txs.empty())
         return false;
 
-    unordered_set_of_hash_cref hashes(sub1(txs_->size()));
-    for (auto tx = txs_->rbegin(); tx != std::prev(txs_->rend()); ++tx)
+    const auto count = coinbase ? sub1(txs.size()) : txs.size();
+    const auto end = coinbase ? std::prev(txs.crend()) : txs.crend();
+    unordered_set_of_hash_cref hashes(count);
+    for (auto tx = txs.crbegin(); tx != end; ++tx)
     {
         for (const auto& in: *(*tx)->inputs_ptr())
             if (hashes.contains(in->point().hash()))
@@ -434,10 +443,10 @@ bool block::is_internal_double_spend(const transaction_cptrs& txs,
     };
 
     unordered_set_of_point_cref points(
-        std::accumulate(txs.begin(), txs.end(), zero, sum));
+        std::accumulate(txs.cbegin(), txs.cend(), zero, sum));
 
-    for (auto tx = coinbase ? std::next(txs.begin()) : txs.begin();
-        tx != txs.end(); ++tx)
+    for (auto tx = coinbase ? std::next(txs.cbegin()) : txs.cbegin();
+        tx != txs.cend(); ++tx)
         for (const auto& in: *(*tx)->inputs_ptr())
             if (!points.emplace(in->point()).second)
                 return true;
@@ -453,7 +462,19 @@ hash_digest block::generate_merkle_root(bool witness) const NOEXCEPT
 
 bool block::is_invalid_merkle_root() const NOEXCEPT
 {
-    return generate_merkle_root(false) != header_->merkle_root();
+    return is_invalid_merkle_root(header_->merkle_root());
+}
+
+bool block::is_invalid_merkle_root(const hash_digest& merkle) const NOEXCEPT
+{
+    return is_invalid_merkle_root(transaction_hashes(false), merkle);
+}
+
+// static
+bool block::is_invalid_merkle_root(hashes&& leaves,
+    const hash_digest& merkle) NOEXCEPT
+{
+    return sha256::merkle_root(std::move(leaves)) != merkle;
 }
 
 // static
@@ -510,33 +531,31 @@ bool block::is_invalid_coinbase_script(size_t height) const NOEXCEPT
     return !script::is_coinbase_pattern(script.ops(), height);
 }
 
-// TODO: add bip50 to chain_state with timestamp range activation.
-// "Special short-term limits to avoid 10,000 BDB lock limit.
-// Count of unique txids <= 4500 to prevent 10000 BDB lock exhaustion.
-// header.timestamp > 1363039171 && header.timestamp < 1368576000."
-bool block::is_hash_limit_exceeded() const NOEXCEPT
+bool block::is_invalid_coinbase_locktime(size_t height) const NOEXCEPT
 {
     if (txs_->empty())
         return false;
 
-    // A set is used to collapse duplicates.
-    unordered_set_of_hash_cref hashes(txs_->size());
+    return txs_->front()->locktime() != sub1(height);
+}
 
-    // Just the coinbase tx hash, skip its null input hashes.
-    hashes.emplace(txs_->front()->get_hash(false));
+bool block::is_final_coinbase_sequence() const NOEXCEPT
+{
+    if (txs_->empty() || txs_->front()->inputs_ptr()->empty())
+        return false;
 
-    for (auto tx = std::next(txs_->begin()); tx != txs_->end(); ++tx)
+    return txs_->front()->inputs_ptr()->front()->is_final();
+}
+
+// A transaction of two merkle leaves size is indistinguishable from a node.
+bool block::is_invalid_transaction_size() const NOEXCEPT
+{
+    const auto invalid = [](const auto& tx) NOEXCEPT
     {
-        // Insert the transaction hash.
-        hashes.emplace((*tx)->get_hash(false));
-        const auto& inputs = (*tx)->inputs_ptr();
+        return tx->serialized_size(false) == invalid_transaction_size;
+    };
 
-        // Insert all input point hashes.
-        for (const auto& input: *inputs)
-            hashes.emplace(input->point().hash());
-    }
-
-    return hashes.size() > hash_limit;
+    return std::any_of(txs_->cbegin(), txs_->cend(), invalid);
 }
 
 // Malleability does not imply malleated.
@@ -554,8 +573,8 @@ bool block::is_malleated() const NOEXCEPT
 bool block::is_malleable32() const NOEXCEPT
 {
     const auto unmalleated = txs_->size();
-    for (auto mally = one; mally <= unmalleated; mally *= two)
-        if (is_malleable32(unmalleated, mally))
+    for (auto width = one; width <= unmalleated; width *= two)
+        if (is_malleable32(unmalleated, width))
             return true;
 
     return false;
@@ -568,41 +587,98 @@ bool block::is_malleated32() const NOEXCEPT
 }
 
 // protected
-// The size of an actual malleation of this block, or zero.
+// The width of the node cloned by a malleation of this block, or zero.
 size_t block::malleated32_size() const NOEXCEPT
 {
-    const auto malleated = txs_->size();
-    for (auto mally = one; mally <= to_half(malleated); mally *= two)
-        if (is_malleable32(malleated - mally, mally) && is_malleated32(mally))
-            return mally;
+    const auto txids = transaction_hashes(false);
+    const auto malleated = txids.size();
+    for (auto width = one; width <= to_half(malleated); width *= two)
+        if (is_malleated32(txids, width))
+            return width;
 
     return zero;
 }
 
 // static
+// Merkle clones the last node at each depth with an odd count above one.
+// The tree over set leaves has ceilinged(set / width) nodes at width depth.
 bool block::is_malleable32(size_t set, size_t width) NOEXCEPT
 {
-    // Malleable when set is odd at width depth and not before and not one.
-    // This is the only case in which Merkle clones the last item in a set.
-    for (auto depth = one; depth <= width; depth *= two, set = to_half(set))
-        if (is_odd(set)) return depth == width && !is_one(set);
+    if (!is_power2(width))
+        return false;
+
+    const auto count = ceilinged_divide(set, width);
+    return is_odd(count) && !is_one(count);
+}
+
+// static
+// The last node at a depth covers the trailing count leaves, padded to width
+// by merkle cloning. Returns the leaf at position within the padded node.
+size_t block::merkle_index(size_t position, size_t count,
+    size_t width) NOEXCEPT
+{
+    BC_ASSERT(is_power2(width) && !is_zero(count));
+    BC_ASSERT(count <= width && position < width);
+
+    size_t base{};
+    while (count < width)
+    {
+        width = to_half(width);
+
+        if (count <= width)
+        {
+            position %= width;
+        }
+        else if (position < width)
+        {
+            break;
+        }
+        else
+        {
+            base += width;
+            position -= width;
+            count -= width;
+        }
+    }
+
+    return base + position;
+}
+
+// static
+bool block::is_malleated32(const hashes& txids) NOEXCEPT
+{
+    const auto malleated = txids.size();
+    for (auto width = one; width <= to_half(malleated); width *= two)
+        if (is_malleated32(txids, width))
+            return true;
 
     return false;
 }
 
-// protected
-// True if the last width set of tx hashes repeats.
-bool block::is_malleated32(size_t width) const NOEXCEPT
+// static
+// A set of tx hashes has the merkle root of a shorter set if and only if at
+// some depth its node count is even and above two and its last two nodes are
+// equal: the shorter set has an odd count at that depth and clones its last
+// node, which the longer set holds. This is the test at width depth.
+bool block::is_malleated32(const hashes& txids, size_t width) NOEXCEPT
 {
-    const auto malleated = txs_->size();
-    if (is_zero(width) || width > to_half(malleated))
+    const auto malleated = txids.size();
+    if (!is_power2(width) || width > to_half(malleated))
         return false;
 
-    auto mally = txs_->rbegin();
-    auto legit = std::next(mally, width);
-    while (!is_zero(width--))
-        if ((*mally++)->get_hash(false) != (*legit++)->get_hash(false))
+    const auto count = ceilinged_divide(malleated, width);
+    if (is_odd(count) || count <= two)
+        return false;
+
+    const auto last = sub1(count) * width;
+    const auto prior = last - width;
+    const auto leaves = malleated - last;
+    for (size_t at{}; at < width; ++at)
+    {
+        const auto in = merkle_index(at, leaves, width);
+        if (txids.at(last + in) != txids.at(prior + at))
             return false;
+    }
 
     return true;
 }
@@ -622,7 +698,7 @@ bool block::is_malleable64(const transaction_cptrs& txs) NOEXCEPT
         return tx->serialized_size(false) == two * hash_size;
     };
 
-    return !txs.empty() && std::all_of(txs.begin(), txs.end(), two_leaves);
+    return !txs.empty() && std::all_of(txs.cbegin(), txs.cend(), two_leaves);
 }
 
 // Malleated64 implies malleable64 and invalid due to non-null coinbase point.
@@ -646,7 +722,7 @@ bool block::is_segregated() const NOEXCEPT
         return tx->is_segregated();
     };
 
-    return std::any_of(txs_->begin(), txs_->end(), segregated);
+    return std::any_of(txs_->cbegin(), txs_->cend(), segregated);
 }
 
 size_t block::segregated() const NOEXCEPT
@@ -656,31 +732,7 @@ size_t block::segregated() const NOEXCEPT
         return tx->is_segregated();
     };
 
-    return std::count_if(txs_->begin(), txs_->end(), count_segregated);
-}
-
-// Last output of commitment pattern holds the committed value [bip141].
-bool block::get_witness_commitment(hash_cref& commitment) const NOEXCEPT
-{
-    // Caller guards empty, which the coinbase access would fault on.
-    BC_ASSERT(!txs_->empty());
-
-    const auto& outputs = *txs_->front()->outputs_ptr();
-    for (const auto& output: std::views::reverse(outputs))
-        if (output->committed_hash(commitment))
-            return true;
-
-    return false;
-}
-
-// Coinbase input witness must be 32 byte witness reserved value [bip141].
-bool block::get_witness_reservation(hash_cref& reservation) const NOEXCEPT
-{
-    // Caller guards empty, which the coinbase access would fault on.
-    BC_ASSERT(!txs_->empty());
-
-    const auto& inputs = *txs_->front()->inputs_ptr();
-    return !inputs.empty() && inputs.front()->reserved_hash(reservation);
+    return std::count_if(txs_->cbegin(), txs_->cend(), count_segregated);
 }
 
 // The witness merkle root is obtained from wtxids, subject to malleation just
@@ -689,22 +741,33 @@ bool block::get_witness_reservation(hash_cref& reservation) const NOEXCEPT
 // Similarly the witness commitment cannot be malleable64.
 bool block::is_invalid_witness_commitment() const NOEXCEPT
 {
-    if (txs_->empty())
-        return false;
+    return !txs_->empty() && is_invalid_witness_commitment(*txs_->front(),
+        generate_merkle_root(true), is_segregated());
+}
 
+// static
+bool block::is_invalid_witness_commitment(const transaction& first,
+    const hash_digest& witness_root, bool segregated) NOEXCEPT
+{
     // Witness data (segregated) disallowed if no commitment [bip141].
     // If no block tx has witness data the commitment is optional [bip141].
     hash_cref commit{ null_hash };
-    if (!get_witness_commitment(commit))
-        return is_segregated();
+    if (!first.get_witness_commitment(commit))
+        return segregated;
 
     // If there is a witness reservation there must be a commitment [bip141].
     hash_cref reserve{ null_hash };
-    if (!get_witness_reservation(reserve))
+    if (!first.get_witness_reservation(reserve))
         return true;
 
     // If there is a valid commitment, return false (valid).
-    return commit != sha256::double_hash(generate_merkle_root(true), reserve);
+    return commit != sha256::double_hash(witness_root, reserve);
+}
+
+bool block::is_invalid_signet_solution(const script& challenge) const NOEXCEPT
+{
+    return txs_->empty() || !signet::verify(*header_, *txs_->front(),
+        transaction_hashes(false), challenge);
 }
 
 //*****************************************************************************
@@ -715,11 +778,10 @@ bool block::is_invalid_witness_commitment() const NOEXCEPT
 // explicitly implements presumed pre-bip42 behavior (shift overflow modulo) by
 // default, and specified bip42 behavior (shift overflow to zero) with bip42.
 //*****************************************************************************
-uint64_t block::subsidy(size_t height, uint64_t subsidy_interval,
+uint64_t block::subsidy(size_t height, size_t subsidy_interval,
     uint64_t initial_block_subsidy_satoshi, bool bip42) NOEXCEPT
 {
-    // Guard: quotient domain cannot increase with positive integer divisor.
-    const auto halves = possible_narrow_cast<size_t>(height / subsidy_interval);
+    const auto halves = floored_divide(height, subsidy_interval);
     return shift_right(initial_block_subsidy_satoshi, halves, bip42);
 }
 
@@ -734,7 +796,7 @@ uint64_t block::fees() const NOEXCEPT
         return ceilinged_add(total, tx->fee());
     };
 
-    return std::accumulate(txs_->begin(), txs_->end(), 0_u64, value);
+    return std::accumulate(txs_->cbegin(), txs_->cend(), 0_u64, value);
 }
 
 // The claim() is the spend of the coinbase transaction.
@@ -744,7 +806,7 @@ uint64_t block::claim() const NOEXCEPT
 }
 
 // The reward() is the sum of all transaction.fee() and the block subsidy.
-uint64_t block::reward(size_t height, uint64_t subsidy_interval,
+uint64_t block::reward(size_t height, size_t subsidy_interval,
     uint64_t initial_block_subsidy_satoshi, bool bip42) const NOEXCEPT
 {
     // Overflow returns max_uint64.
@@ -752,7 +814,7 @@ uint64_t block::reward(size_t height, uint64_t subsidy_interval,
         initial_block_subsidy_satoshi, bip42));
 }
 
-bool block::is_overspent(size_t height, uint64_t subsidy_interval,
+bool block::is_overspent(size_t height, size_t subsidy_interval,
     uint64_t initial_block_subsidy_satoshi, bool bip42) const NOEXCEPT
 {
     return claim() > reward(height, subsidy_interval,
@@ -768,7 +830,7 @@ size_t block::signature_operations(bool bip16, bool bip141) const NOEXCEPT
         return ceilinged_add(total, add);
     };
 
-    return std::accumulate(txs_->begin(), txs_->end(), zero, value);
+    return std::accumulate(txs_->cbegin(), txs_->cend(), zero, value);
 }
 
 bool block::is_signature_operations_limited(bool bip16,
@@ -795,7 +857,7 @@ code block::populate(const transaction_cptrs& txs, const chain::context& ctx,
     {
         return ceilinged_add(total, tx->outputs());
     };
-    const auto count = std::accumulate(txs.begin(), txs.cend(), zero, sum);
+    const auto count = std::accumulate(txs.cbegin(), txs.cend(), zero, sum);
     unordered_map_of_cref_point_to_output_cptr_cref points(count);
     uint32_t index{};
 
@@ -862,7 +924,7 @@ code block::check_transactions(const context& ctx) const NOEXCEPT
 code block::accept_transactions(const context& ctx) const NOEXCEPT
 {
     if (!is_empty())
-        for (auto tx = std::next(txs_->begin()); tx != txs_->end(); ++tx)
+        for (auto tx = std::next(txs_->cbegin()); tx != txs_->cend(); ++tx)
             if (const auto ec = (*tx)->accept(ctx))
                 return ec;
 
@@ -874,7 +936,7 @@ code block::connect_transactions(const context& ctx,
     const signatures& capture) const NOEXCEPT
 {
     if (!is_empty())
-        for (auto tx = std::next(txs_->begin()); tx != txs_->end(); ++tx)
+        for (auto tx = std::next(txs_->cbegin()); tx != txs_->cend(); ++tx)
             if (const auto ec = (*tx)->connect(ctx, capture))
                 return ec;
 
@@ -885,31 +947,64 @@ code block::connect_transactions(const context& ctx,
 code block::confirm_transactions(const context& ctx) const NOEXCEPT
 {
     if (!is_empty())
-        for (auto tx = std::next(txs_->begin()); tx != txs_->end(); ++tx)
+        for (auto tx = std::next(txs_->cbegin()); tx != txs_->cend(); ++tx)
             if (const auto ec = (*tx)->confirm(ctx))
                 return ec;
 
     return error::block_success;
 }
 
-// Identity.
+// Guards.
 // ----------------------------------------------------------------------------
 
-code block::identify() const NOEXCEPT
+// static
+code block::check_guard(const hash_digest& merkle_root, const hashes& txids,
+    bool malleated64) NOEXCEPT
 {
-    if (is_malleated() || is_invalid_merkle_root())
+    if (malleated64 || is_malleated32(txids))
+        return error::invalid_transaction_commitment;
+    if (is_invalid_merkle_root(hashes{ txids }, merkle_root))
         return error::invalid_transaction_commitment;
 
     return error::block_success;
 }
 
+// static
 // bip141 should be disabled when the node is not accepting witness data.
-code block::identify(const context& ctx) const NOEXCEPT
+code block::check_guard(const context& ctx, const transaction& first,
+    const hash_digest& witness_root, bool segregated) NOEXCEPT
 {
-    const auto invalid = ctx.is_enabled(bip141_rule) ?
-        is_invalid_witness_commitment() : is_segregated();
+    const auto bip141 = ctx.is_enabled(bip141_rule);
 
-    return invalid ? error::invalid_witness_commitment : error::block_success;
+    if (bip141 &&
+        is_invalid_witness_commitment(first, witness_root, segregated))
+        return error::invalid_witness_commitment;
+    if (!bip141 && segregated)
+        return error::invalid_witness_commitment;
+
+    return error::block_success;
+}
+
+code block::check_guard() const NOEXCEPT
+{
+    if (is_malleated())
+        return error::invalid_transaction_commitment;
+    if (is_invalid_merkle_root())
+        return error::invalid_transaction_commitment;
+
+    return error::block_success;
+}
+
+code block::check_guard(const context& ctx) const NOEXCEPT
+{
+    const auto bip141 = ctx.is_enabled(bip141_rule);
+
+    if (bip141 && is_invalid_witness_commitment())
+        return error::invalid_witness_commitment;
+    if (!bip141 && is_segregated())
+        return error::invalid_witness_commitment;
+
+    return error::block_success;
 }
 
 // Validation.
@@ -945,22 +1040,30 @@ code block::check(bool identity) const NOEXCEPT
 // timestamp
 // median_time_past
 
-// Use of get_hash() in is_hash_limit_exceeded makes this thread-unsafe.
 // bip141 should be disabled when the node is not accepting witness data.
-code block::check(const context& ctx, bool identity) const NOEXCEPT
+code block::check(const context& ctx, bool identity,
+    const script& challenge) const NOEXCEPT
 {
     const auto bip141 = ctx.is_enabled(bip141_rule);
     const auto bip34 = ctx.is_enabled(bip34_rule);
-    const auto bip50 = ctx.is_enabled(bip50_rule);
+    const auto bip54_txsize = ctx.is_enabled(bip54_txsize_rule);
+    const auto bip54_coinbase = ctx.is_enabled(bip54_coinbase_rule);
+    const auto signet = ctx.is_enabled(signet_rule);
 
     if (bip141 && is_overweight())
         return error::block_weight_limit;
     if (bip34 && is_invalid_coinbase_script(ctx.height))
         return error::coinbase_height_mismatch;
-    if (bip50 && is_hash_limit_exceeded())
-        return error::temporary_hash_limit;
+    if (bip54_txsize && is_invalid_transaction_size())
+        return error::invalid_transaction_size;
+    if (bip54_coinbase && is_invalid_coinbase_locktime(ctx.height))
+        return error::coinbase_locktime_mismatch;
+    if (bip54_coinbase && is_final_coinbase_sequence())
+        return error::coinbase_sequence_final;
     if (bip141 && identity && is_invalid_witness_commitment())
         return error::invalid_witness_commitment;
+    if (signet && is_invalid_signet_solution(challenge))
+        return error::invalid_signet_solution;
 
     return check_transactions(ctx);
 }
@@ -991,6 +1094,7 @@ code block::accept(const context& ctx, size_t subsidy_interval,
 // This assumes that prevout and metadata caching are completed on all inputs.
 code block::confirm(const context& ctx) const NOEXCEPT
 {
+    // TODO: restore bip30 unspent coinbase collision check from prevout metadata.
     return confirm_transactions(ctx);
 }
 

@@ -53,6 +53,16 @@ inline bool deserialize(uint8_t& out, const std::string_view& text) NOEXCEPT
     return value <= max_uint8;
 }
 
+inline bool deserialize(char& out, const std::string_view& text) NOEXCEPT
+{
+    const auto trimmed = trim_copy(text);
+    if (trimmed.empty())
+        return false;
+
+    out = trimmed.front();
+    return true;
+}
+
 template <size_t Size>
 bool deserialize(data_array<Size>& out, const std::string_view& text) NOEXCEPT
 {
@@ -62,22 +72,6 @@ bool deserialize(data_array<Size>& out, const std::string_view& text) NOEXCEPT
 inline bool deserialize(data_chunk& out, const std::string_view& text) NOEXCEPT
 {
     return decode_base16(out, text);
-}
-
-template <typename Value, size_t Size>
-bool deserialize(std_array<Value, Size>& out, const std::string_view& text) NOEXCEPT
-{
-    auto result = true;
-    const auto deserializer = [&result](const std::string_view& token) NOEXCEPT
-    {
-        Value value{};
-        result &= deserialize(value, token);
-        return value;
-    };
-
-    const auto tokens = split(text);
-    std::transform(tokens.begin(), tokens.end(), out.begin(), deserializer);
-    return result;
 }
 
 template <typename Value>
@@ -93,11 +87,20 @@ bool deserialize(std_vector<Value>& out, const std::string_view& text) NOEXCEPT
 
     const auto tokens = split(text);
     out.resize(tokens.size());
-    std::transform(tokens.begin(), tokens.end(), out.begin(), deserializer);
+    std::transform(tokens.cbegin(), tokens.cend(), out.begin(), deserializer);
     return result;
 }
 
-template <typename Value>
+template <typename Integer, if_integral<Integer>>
+bool deserialize(Integer& out, const std::string_view& text) NOEXCEPT
+{
+    const auto trimmed = trim_copy(text);
+    const auto last = std::next(trimmed.data(), trimmed.size());
+    const auto [end, ec] = std::from_chars(trimmed.data(), last, out);
+    return ec == std::errc{} && end == last;
+}
+
+template <typename Value, if_non_integral<Value>>
 bool deserialize(Value& out, const std::string_view& text) NOEXCEPT
 {
     // Trimming is useful for type conversion, which otherwise fails.

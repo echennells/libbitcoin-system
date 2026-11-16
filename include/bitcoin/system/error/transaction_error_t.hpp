@@ -48,12 +48,12 @@ enum transaction_error_t
     // accept transaction
     unexpected_witness_transaction,
     premature_validation,
-    unspent_duplicate,
     missing_previous_output,
     double_spend,
     coinbase_maturity,
     spend_exceeds_value,
     transaction_sigop_limit,
+    transaction_prevout_sigop_limit,
     absolute_time_locked,
     relative_time_locked,
     transaction_weight_limit,
@@ -66,7 +66,7 @@ enum transaction_error_t
     tx_error_last
 };
 
-DECLARE_ERROR_T_CODE_CATEGORY(transaction_error);
+DECLARE_ERROR_T_CODE_CATEGORY(transaction_error, BC_API);
 
 } // namespace error
 } // namespace system

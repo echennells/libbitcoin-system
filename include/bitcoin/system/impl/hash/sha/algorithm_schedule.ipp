@@ -52,6 +52,7 @@ prepare(auto& buffer) NOEXCEPT
 }
 
 TEMPLATE
+template <bool Konstant>
 constexpr void CLASS::
 schedule_(auto& buffer) NOEXCEPT
 {
@@ -126,7 +127,8 @@ schedule_(auto& buffer) NOEXCEPT
         prepare<79>(buffer);
     }
 
-    konstant(buffer);
+    if constexpr (Konstant)
+        konstant(buffer);
 }
 
 TEMPLATE
@@ -145,6 +147,27 @@ schedule(buffer_t& buffer) NOEXCEPT
     else
     {
         schedule_(buffer);
+    }
+}
+
+TEMPLATE
+constexpr void CLASS::
+schedule_compress(state_t& state, buffer_t& buffer) NOEXCEPT
+{
+    if (std::is_constant_evaluated())
+    {
+        schedule(buffer);
+        compress(state, buffer);
+    }
+    else if constexpr (vector && SHA::strength != 160 && have_lanes<word_t, 8>)
+    {
+        // Single block (without shani) interleaved scheduling optimization.
+        schedule_compress_sigma(state, buffer);
+    }
+    else
+    {
+        schedule(buffer);
+        compress(state, buffer);
     }
 }
 

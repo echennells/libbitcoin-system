@@ -20,6 +20,7 @@
 #define LIBBITCOIN_SYSTEM_MATH_FUNCTIONAL_HPP
 
 #include <bitcoin/system/define.hpp>
+#include <bitcoin/system/intrinsics/intrinsics.hpp>
 #include <bitcoin/system/math/cast.hpp>
 #include <bitcoin/system/math/rotate.hpp>
 
@@ -89,6 +90,12 @@ INLINE constexpr auto add(Word a, Word b) NOEXCEPT
     return depromote<Word>(a + b);
 }
 
+template <auto S = 0, typename Word, if_integral_integer<Word> = true>
+INLINE constexpr auto sub(Word a, Word b) NOEXCEPT
+{
+    return depromote<Word>(a - b);
+}
+
 template <auto K, auto S = 0, typename Word, if_integral_integer<Word> = true>
 INLINE constexpr auto addc(Word a) NOEXCEPT
 {
@@ -101,10 +108,70 @@ INLINE constexpr auto mul(Word a, Word b) NOEXCEPT
     return depromote<Word>(a * b);
 }
 
+template <auto S = 0, typename Word, if_integral_integer<Word> = true>
+INLINE constexpr auto min(Word a, Word b) NOEXCEPT
+{
+    return a < b ? a : b;
+}
+
 template <typename Word, if_integral_integer<Word> = true>
 INLINE constexpr Word broadcast(Word a) NOEXCEPT
 {
     return a;
+}
+
+/// 52 bit fused multiply-add
+/// ---------------------------------------------------------------------------
+
+template <auto S = 0, typename Word, if_same<Word, uint64_t> = true>
+INLINE constexpr Word madd52lo(Word c, Word a, Word b) NOEXCEPT
+{
+    return system::madd52lo(c, a, b);
+}
+
+template <auto S = 0, typename Word, if_same<Word, uint64_t> = true>
+INLINE constexpr Word madd52hi(Word c, Word a, Word b) NOEXCEPT
+{
+    return system::madd52hi(c, a, b);
+}
+
+/// compare/select
+/// ---------------------------------------------------------------------------
+/// Masks are all bits set (true) or unset (false) per word.
+
+template <typename Word, if_integral_integer<Word> = true>
+INLINE constexpr auto andnot(Word a, Word b) NOEXCEPT
+{
+    return depromote<Word>(~a & b);
+}
+
+template <auto S = 0, typename Word, if_integral_integer<Word> = true>
+INLINE constexpr auto eq(Word a, Word b) NOEXCEPT
+{
+    return depromote<Word>(Word{} - to_int<Word>(a == b));
+}
+
+template <typename Word, if_integral_integer<Word> = true>
+INLINE constexpr auto select(Word mask, Word a, Word b) NOEXCEPT
+{
+    return or_(and_(mask, a), andnot(mask, b));
+}
+
+template <typename Word, if_integral_integer<Word> = true>
+INLINE constexpr bool any(Word a) NOEXCEPT
+{
+    return !is_zero(a);
+}
+
+/// gather
+/// ---------------------------------------------------------------------------
+
+template <typename Word, if_integral_integer<Word> = true>
+INLINE constexpr Word gather(const Word* table, Word index) NOEXCEPT
+{
+    BC_PUSH_WARNING(NO_POINTER_ARITHMETIC)
+    return table[possible_narrow_cast<size_t>(index)];
+    BC_POP_WARNING()
 }
 
 } // namespace f

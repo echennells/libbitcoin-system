@@ -12,7 +12,6 @@
 *.pyc
 
 # store
-*.bin
 *.head
 *.data
 
@@ -33,6 +32,12 @@ builds/gnu/.dirstamp
 
 # pkg-config pc file from .pc.in
 builds/gnu/*.pc
+
+# configured headers from in-tree configure
+builds/gnu/include
+
+# configured sources from in-tree make
+builds/gnu/src
 
 # msbuild/msvc
 /.vs

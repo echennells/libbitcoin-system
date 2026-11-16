@@ -35,11 +35,7 @@ struct forks
     bool bip90;
 
     /// github.com/bitcoin/bitcoin/commit/a206b0ea12eb4606b93323268fc81a4f1f952531
-    /// github.com/bitcoin/bitcoin/pull/6931
-    /// github.com/bitcoin/bitcoin/pull/12204
     bool bip30;
-    bool bip30_deactivate;
-    bool bip30_reactivate;
 
     /// github.com/bitcoin/bitcoin/pull/3842
     bool bip42;
@@ -63,8 +59,12 @@ struct forks
     bool bip341;
     bool bip342;
 
-    /////// bip9 bit4 activation group ("segsignal").
-    ////bool bip91;
+    /// bip54 deployments.
+    bool bip54_timewarp;
+    bool bip54_timespan;
+    bool bip54_sigops;
+    bool bip54_txsize;
+    bool bip54_coinbase;
 
     /// Regtest does not retarget.
     bool retarget;
@@ -75,6 +75,9 @@ struct forks
     // github.com/bitcoin/bitcoin/pull/29775 ("testnet4")
     bool time_warp_patch;
     bool block_storm_patch;
+
+    // github.com/bitcoin/bitcoin/pull/18267 ("signet")
+    bool signet;
 
     /// Litecoin deviations from Bitcoin.
     bool ltc_time_warp_patch;

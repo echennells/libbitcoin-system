@@ -1,0 +1,135 @@
+/**
+ * Copyright (c) 2011-2026 libbitcoin developers
+ *
+ * This file is part of libbitcoin.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+#ifndef LIBBITCOIN_SYSTEM_CRYPTO_SECP256K1_BATCH_HPP
+#define LIBBITCOIN_SYSTEM_CRYPTO_SECP256K1_BATCH_HPP
+
+#include <atomic>
+#include <numeric>
+#include <thread>
+#include <bitcoin/system/crypto/secp256k1/algorithm.hpp>
+#include <bitcoin/system/crypto/secp256k1/batch/batch.hpp>
+#include <bitcoin/system/data/data.hpp>
+#include <bitcoin/system/define.hpp>
+#include <bitcoin/system/endian/endian.hpp>
+#include <bitcoin/system/execution.hpp>
+#include <bitcoin/system/math/math.hpp>
+#include "../cuda/driver.hpp"
+
+namespace libbitcoin {
+namespace system {
+
+BC_PUSH_WARNING(NO_USE_OF_SPAN)
+BC_PUSH_WARNING(NO_ARRAY_INDEXING)
+BC_PUSH_WARNING(NO_VIEW_REFERENCING)
+BC_PUSH_WARNING(NO_THROW_IN_NOEXCEPT)
+
+// Rows verify in the widest available ifma lanes, then 512 bit lanes (madd52
+// emulated), or integrally.
+template <typename Verify>
+inline bool with_lanes(Verify&& verify) NOEXCEPT
+{
+    if constexpr (have_ifma<xint512_t>)
+        return verify.template operator()<xint512_t>();
+    else if constexpr (have_ifma<xint256_t>)
+        return verify.template operator()<xint256_t>();
+    else if constexpr (have<xint512_t>)
+        return verify.template operator()<xint512_t>();
+    else
+        return verify.template operator()<uint64_t>();
+}
+
+inline size_t count_to_rows(size_t count) NOEXCEPT
+{
+    constexpr size_t minimum = 32;
+    const auto threads = std::max(std::thread::hardware_concurrency(), 1u);
+    return greater(minimum, ceilinged_divide(count, two * threads));
+}
+
+// Chunks of rows verify in parallel, each into its own results, sized to
+// occupy the processors twice over but not below a few lane groups.
+template <typename Batch, typename Verify>
+data_chunk batch_verify_(const stopper& cancel, const Batch& batch,
+    Verify&& verify) NOEXCEPT
+{
+    constexpr auto policy = execution::par;
+    const auto count = batch.correlates.size();
+    const auto rows = count_to_rows(count);
+    std::vector<size_t> it(ceilinged_divide(count, rows));
+    std::iota(it.begin(), it.end(), zero);
+    stopper failed{};
+
+    data_chunk results(count);
+    std::for_each(policy, it.cbegin(), it.cend(), [&](size_t chunk) NOEXCEPT
+    {
+        if (cancel)
+            return;
+
+        data_chunk out{};
+        const auto first = chunk * rows;
+        const auto size = std::min(rows, count - first);
+        if (!verify(out, batch.points.subspan(first, size),
+            batch.digests.subspan(first, size),
+            batch.signatures.subspan(first, size)))
+            failed.store(true);
+
+        const auto in = std::next(results.begin(), to_signed(first));
+        std::copy(out.cbegin(), out.cend(), in);
+    });
+
+    // Empty implies fully-verified batch (or canceled, which caller gates).
+    if (cancel || !failed)
+        results.clear();
+
+    return results;
+}
+
+LCOV_EXCL_START("Requires a gpu.")
+
+template <typename Batch, typename Verify>
+data_chunk batch_verify(const stopper& cancel, bool& use_gpu, Batch& batch,
+    Verify&& verify) NOEXCEPT
+{
+    namespace cuda = secp256k1::cuda;
+
+    data_chunk results{};
+    use_gpu = use_gpu && cuda::available() &&
+        cuda::verify(cancel, results, batch);
+
+    return use_gpu ? results : batch_verify_(cancel, batch, verify);
+}
+
+LCOV_EXCL_STOP()
+
+inline void push_fail(batched::links_t& fails,
+    const batched::link& id) NOEXCEPT
+{
+    // Terminal indicates a partially-written signature table row (no-count).
+    if (id != batched::terminal)
+        fails.push_back(from_little_array<batched::link_t>(id));
+}
+
+BC_POP_WARNING()
+BC_POP_WARNING()
+BC_POP_WARNING()
+BC_POP_WARNING()
+
+} // namespace system
+} // namespace libbitcoin
+
+#endif

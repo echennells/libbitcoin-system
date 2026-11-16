@@ -19,6 +19,7 @@
 #ifndef LIBBITCOIN_SYSTEM_HAVE_HPP
 #define LIBBITCOIN_SYSTEM_HAVE_HPP
 
+#include <version>
 #include <bitcoin/system/version.hpp>
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -40,10 +41,16 @@
     #define HAVE_NETBSD
 #elif defined(__CYGWIN__)
     #define HAVE_CYGWIN
+#elif defined(_WIN32)
+    #define HAVE_WINDOWS
+#endif
+
+#if defined(HAVE_FREEBSD) || defined(HAVE_OPENBSD) || defined(HAVE_NETBSD)
+    #define HAVE_BSD
 #endif
 
 // Others excluded presently due to lack of verified support.
-#if defined(HAVE_LINUX) || defined(HAVE_APPLE)
+#if defined(HAVE_LINUX) || defined(HAVE_APPLE) || defined(HAVE_FREEBSD)
     #define HAVE_POSIX
 #endif
 
@@ -61,11 +68,19 @@
 #if defined(_MSC_VER) && !defined(HAVE_CLANG)
     #define HAVE_MSC
 #endif
+#if defined(_MSVC_STL_VERSION)
+    #define HAVE_MSVC_STL
+#endif
+#if defined(_LIBCPP_VERSION)
+    #define HAVE_LIBCPP
+#endif
 
 /// Determines linker defines (Windows vs. Unix/Linux).
-#if defined(HAVE_CLANG) || defined(HAVE_GNUC)
+#if defined(_MSC_VER) && !defined(WITH_PTX)
+    #define HAVE_WINDOWS_LIBS
+#elif defined(HAVE_CLANG) || defined(HAVE_GNUC)
     #define HAVE_NX_LIBS
-#elif defined(_MSC_VER) || defined(__CYGWIN__)
+#elif defined(__CYGWIN__)
     #define HAVE_WINDOWS_LIBS
 #endif
 
@@ -84,33 +99,77 @@
 #elif defined(__aarch64__) || defined(_M_ARM64)
     #define HAVE_ARM64
     #define HAVE_ARM
+#elif defined(__s390x__)
+    #define HAVE_S390X
+#elif defined(__powerpc64__)
+    #define HAVE_PPC64
+#elif !defined(WITH_PTX)
+    #error "Unsupported architecture."
 #endif
 
 /// WITH_ build symbols.
 /// ---------------------------------------------------------------------------
 
-/// vc++: There are no flags for SHANI/CRYPTO, so use custom WITH_SHA option.
-#if defined(HAVE_MSC) && defined(WITH_SHA)
-    #if defined(HAVE_XCPU)
+/// vc++: There are no flags for SSE4.1, SHANI, SHA512, AVX512IFMA, AVXIFMA,
+/// AES-NI and VAES, so use custom WITH_ options.
+#if defined(HAVE_MSC) && defined(HAVE_XCPU)
+    #if defined(WITH_SSE41) && !defined(__SSE4_1__)
+        #define __SSE4_1__
+    #endif
+    #if defined(WITH_SHANI)
         #define __SHA__
-    #elif defined(HAVE_ARM)
-        #define __ARM_FEATURE_CRYPTO
+    #endif
+    #if defined(WITH_SHA512)
+        #define __SHA512__
+    #endif
+    #if defined(WITH_AVX512IFMA)
+        #define __AVX512IFMA__
+    #endif
+    #if defined(WITH_AVXIFMA)
+        #define __AVXIFMA__
+    #endif
+    #if defined(WITH_AESNI)
+        #define __AES__
+        #define __PCLMUL__
+    #endif
+    #if defined(WITH_VAES)
+        #define __VAES__
+        #define __VPCLMULQDQ__
     #endif
 #endif
 
-// Custom options to use extended SVE variable width.
-#if defined(__ARM_FEATURE_SVE)
-    #if defined(WITH_512)
-        #define HAVE_512
+/// vc++: There are no flags for SHA2, SHA3 and AES, so use custom WITH_ options.
+#if defined(HAVE_MSC) && defined(HAVE_ARM)
+    #if defined(WITH_SHA2)
+        #define __ARM_FEATURE_SHA2
     #endif
-    #if defined(WITH_256)
-        #define HAVE_256
+    #if defined(WITH_SHA3)
+        #define __ARM_FEATURE_SHA512
+    #endif
+    #if defined(WITH_AES)
+        #define __ARM_FEATURE_AES
     #endif
 #endif
 
-// shrec/UltrafastSecp256k1 (otherwise secp256k1)
-#if defined(WITH_ULTRAFAST)
-    #define HAVE_ULTRAFAST
+// native secp256k1 (otherwise external secp256k1)
+#if defined(WITH_SECP256K1)
+    #define HAVE_SECP256K1
+#endif
+
+// Valgrind memcheck client requests.
+#if defined(WITH_VALGRIND)
+    #define HAVE_VALGRIND
+#endif
+
+// Compilation of device kernels to ptx (developer).
+#if defined(WITH_PTX)
+    #define HAVE_PTX
+#endif
+
+// Device (gpu) batch verification.
+#if defined(WITH_CUDA) && !defined(HAVE_APPLE) && \
+    (defined(HAVE_X64) || defined(HAVE_ARM64))
+    #define HAVE_CUDA
 #endif
 
 /// Platform features derived.
@@ -121,17 +180,49 @@
     #define __SSE4_1__
 #endif
 
-/// vc++: ARM implies NEON, SVE not supported, CRYPTO requires custom option.
+/// vc++: AVX512 (/arch:AVX512) implies AVX512VL.
+#if defined(HAVE_MSC) && defined(__AVX512BW__) && !defined(__AVX512VL__)
+    #define __AVX512VL__
+#endif
+
+/// vc++: ARM implies NEON, CRYPTO requires custom option.
 #if defined(HAVE_MSC) && defined(HAVE_ARM) && !defined(__ARM_NEON)
     #define __ARM_NEON
 #endif
 
 /// Guard assumption of hierarchy.
-#if defined(__SHA__) && !defined(__SSE4_1__)
+#if defined(__AVX512IFMA__) && !defined(__AVX512VL__)
+    #define __AVX512VL__
+#endif
+#if defined(__AVX512VL__) && !defined(__AVX512F__)
+    #define __AVX512F__
+#endif
+#if defined(__AVX512BW__) && !defined(__AVX512F__)
+    #define __AVX512F__
+#endif
+#if defined(__AVX512F__) && !defined(__AVX2__)
+    #define __AVX2__
+#endif
+#if defined(__AVXIFMA__) && !defined(__AVX2__)
+    #define __AVX2__
+#endif
+#if defined(__SHA512__) && !defined(__AVX2__)
+    #define __AVX2__
+#endif
+#if defined(__VAES__) && !defined(__AES__)
+    #define __AES__
+#endif
+#if defined(__VPCLMULQDQ__) && !defined(__PCLMUL__)
+    #define __PCLMUL__
+#endif
+#if defined(__VAES__) && !defined(__AVX2__)
+    #define __AVX2__
+#endif
+#if defined(__AES__) && !defined(__SSE4_1__)
     #define __SSE4_1__
 #endif
-#if defined(__AVX512BW__) && !defined(__AVX2__)
-    #define __AVX2__
+#if defined(__SHA__) && !defined(__SSE4_1__)
+    #define __SSE4_1__
 #endif
 #if defined(__AVX2__) && !defined(__AVX__)
     #define __AVX__
@@ -142,7 +233,13 @@
 #if defined(__ARM_FEATURE_CRYPTO) && !defined(__ARM_NEON)
     #define __ARM_NEON
 #endif
-#if defined(__ARM_FEATURE_SVE) && !defined(__ARM_NEON)
+#if defined(__ARM_FEATURE_SHA2) && !defined(__ARM_NEON)
+    #define __ARM_NEON
+#endif
+#if defined(__ARM_FEATURE_AES) && !defined(__ARM_NEON)
+    #define __ARM_NEON
+#endif
+#if defined(__ARM_FEATURE_SHA512) && !defined(__ARM_NEON)
     #define __ARM_NEON
 #endif
 
@@ -155,9 +252,17 @@
         #define HAVE_SHANI
         #define HAVE_SHA
     #endif
-    // -mavx512bw
+    // -mavx2 -msha512
+    // vc++: SHA512 not independently configurable (requires custom option).
+    #if defined(__SHA512__)
+        #define HAVE_SHANI512
+        #define HAVE_SHA512
+    #endif
+    // -mavx512bw -mavx512vl
     // vc++: Advanced Vector Extensions 512 (X86/X64) (/arch:AVX512)
-    #if defined(__AVX512BW__)
+    // AVX512VL is required because without it compilers widen 256 bit rotates
+    // to 512 bit, which lowers the clock of cpus that throttle avx512.
+    #if defined(__AVX512BW__) && defined(__AVX512VL__)
         #define HAVE_AVX512
         #define HAVE_512
     #endif
@@ -167,33 +272,96 @@
         #define HAVE_AVX2
         #define HAVE_256
     #endif
+    // -mavx
+    // vc++: Advanced Vector Extensions (X86/X64) (/arch:AVX)
+    #if defined(__AVX__)
+        #define HAVE_AVX
+    #endif
     // -msse4.1
     // vc++: Use Advanced Vector Extensions (X86/X64) (/arch:AVX).
     #if defined(__SSE4_1__)
-        #define HAVE_SSE4
+        #define HAVE_SSE41
         #define HAVE_128
+    #endif
+    // -mavx512ifma -mavx512vl
+    // vc++: AVX512IFMA not independently configurable (requires custom option).
+    #if defined(__AVX512IFMA__)
+        #define HAVE_AVX512IFMA
+    #endif
+    // -mavxifma
+    // vc++: AVXIFMA not independently configurable (requires custom option).
+    #if defined(__AVXIFMA__)
+        #define HAVE_AVXIFMA
+    #endif
+    // -maes -mpclmul
+    // vc++: AES-NI not independently configurable (requires custom option).
+    #if defined(__AES__) && defined(__PCLMUL__)
+        #define HAVE_AESNI
+        #define HAVE_AES
+    #endif
+    // -mvaes -mvpclmulqdq
+    // vc++: VAES not independently configurable (requires custom option).
+    #if defined(__VAES__) && defined(__VPCLMULQDQ__)
+        #define HAVE_VAES
+    #endif
+    // -march=x86-64-v4
+    // vc++: Advanced Vector Extensions 512 (/arch:AVX512) is this level.
+    #if defined(HAVE_X64) && defined(__AVX512F__) && defined(__AVX512BW__) && \
+        defined(__AVX512CD__) && defined(__AVX512DQ__) && defined(__AVX512VL__)
+        #define HAVE_X86_64_V4
+    #endif
+    // -march=x86-64-v3
+    // vc++: Advanced Vector Extensions 2 (/arch:AVX2) is treated as this level.
+    #if defined(HAVE_X64) && (defined(HAVE_X86_64_V4) || defined(__BMI2__) || \
+        defined(__FMA__) || defined(__MOVBE__) || \
+        (defined(HAVE_MSC) && defined(__AVX2__)))
+        #define HAVE_X86_64_V3
+    #endif
+    // -march=x86-64-v2
+    #if defined(HAVE_X64) && (defined(HAVE_X86_64_V3) || \
+        defined(__SSE4_2__) || defined(__POPCNT__))
+        #define HAVE_X86_64_V2
+    #endif
+
+    // 52 bit fused multiply-add by lane width.
+    #if defined(HAVE_AVX512IFMA) || defined(HAVE_AVXIFMA)
+        #define HAVE_IFMA_256
+        #define HAVE_IFMA_128
+    #endif
+    #if defined(HAVE_AVX512IFMA) && defined(HAVE_AVX512)
+        #define HAVE_IFMA_512
     #endif
 #endif
 
 /// Map standard ARM defines for intrinsics usage. 
-/// SVE maximum width is not detectable (requires custom options).
+#if defined(HAVE_ARM64)
+    // -march=armv8-a+aes
+    #if defined(__ARM_FEATURE_AES) || defined(__ARM_FEATURE_CRYPTO)
+        #define HAVE_NEON_AES
+        #define HAVE_AES
+    #endif
+    // -march=armv8.2-a+sha3
+    #if defined(__ARM_FEATURE_SHA512)
+        #define HAVE_NEON_SHA3
+        #define HAVE_SHA512
+    #endif
+    // -march=armv8.1-a
+    #if defined(__ARM_FEATURE_ATOMICS)
+        #define HAVE_LSE
+    #endif
+#endif
 #if defined(HAVE_ARM)
-    // -march=armv8-a+crypto
-    // Requires 64 bit build.
-    #if defined(__ARM_FEATURE_CRYPTO)
-        #define HAVE_CRYPTO
-        #define HAVE_SHA
-    #endif
-    // -march=armv8-a+sve
-    // Requires 64 bit build.
-    #if defined(__ARM_FEATURE_SVE)
-        #define HAVE_SVE
-    #endif
     // -march=armv8-a (64 bit)
     // -march=armv7-a -mfpu=neon -mfloat-abi=hard (32 bit)
     #if defined(__ARM_NEON)
         #define HAVE_NEON
         #define HAVE_128
+    #endif
+    // -march=armv8-a+sha2 (64 bit)
+    // -march=armv8-a -mfpu=crypto-neon-fp-armv8 -mfloat-abi=hard (32 bit)
+    #if defined(__ARM_FEATURE_SHA2) || defined(__ARM_FEATURE_CRYPTO)
+        #define HAVE_NEON_SHA
+        #define HAVE_SHA
     #endif
 #endif
 
@@ -227,7 +395,7 @@
 #endif
 
 /// ARM architecture inline assembly.
-#if defined(HAVE_ARM) && !(defined(HAVE_MSC) && defined(HAVE_X32))
+#if defined(HAVE_ARM) && !defined(HAVE_MSC)
     #define HAVE_ARM_ASSEMBLY
 #endif
 

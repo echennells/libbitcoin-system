@@ -18,9 +18,6 @@
  */
 #include <bitcoin/system/define.hpp>
 
-////// Required in source (cpp) for boost header only.
-////#include <boost/json/src.hpp>
-
 // This is a maintainer file to force rebuild of /system only.
 
 // define.hpp is the common include for /system.
@@ -28,12 +25,10 @@
 // System inclusions are chained as follows.
 
 // version        : <generated>
-// execution      : 
 // have           : version
-// preprocessor   : have, execution
+// preprocessor   : have
 // warnings       : preprocessor
-// boost          : warnings
-// exceptions     : boost
+// exceptions     : warnings
 // arena          : exceptions
 // allocator      : arena
 // types          : allocator
@@ -43,29 +38,31 @@
 // typelets       : funclets
 // constraints    : typelets
 // define         : constraints
-// forks          :
 
 // Other directory common includes are not internally chained.
 // Each header includes only its required common headers.
 
-// /error         : define
-// /unicode       : define
 // /intrinsics    : define
 // /math          : /intrinsics
-// /data          : /math /unicode
+// execution      : /math
+// forks          : <nothing>
+// /unicode       : /math
+// /data          : /unicode
 // /endian        : /data
+// /error         : define
 // /words         : /data
 // /radix         : /words
-// /serial        : /radix
-// /hash          : /radix /endian
-// /crypto        : /hash
-// /stream        : /crypto /endian /error
-// /filter        : /stream
-// /chain         : /stream forks [forward: settings]
-// /machine       : /chain
+// /hash          : /endian /radix execution
+// /crypto        : /error /hash
+// /serial        : /error /radix
+// /stream        : /error /hash
+// /chain         : /crypto /serial /stream forks  [forward: settings]
 // /config        : /chain
-// /wallet        : /chain filter
-// settings       : /chain forks
+// settings       : /config
+// /filter        : /stream
+// /machine       : /chain
+// /wallet        : /chain
+// /x509          : /crypto
 
 // When a symbol is unexplainably undefined, its defining include is probably
 // creating the circularity.
@@ -87,8 +84,14 @@ DEFINED("HAVE_OPENBSD")
 #ifdef HAVE_NETBSD
 DEFINED("HAVE_NETBSD")
 #endif
+#ifdef HAVE_BSD
+DEFINED("HAVE_BSD")
+#endif
 #ifdef HAVE_CYGWIN
 DEFINED("HAVE_CYGWIN")
+#endif
+#ifdef HAVE_WINDOWS
+DEFINED("HAVE_WINDOWS")
 #endif
 #ifdef HAVE_POSIX
 DEFINED("HAVE_POSIX")
@@ -105,6 +108,12 @@ DEFINED("HAVE_GNUC")
 #endif
 #ifdef HAVE_MSC
 DEFINED("HAVE_MSC")
+#endif
+#ifdef HAVE_MSVC_STL
+DEFINED("HAVE_MSVC_STL")
+#endif
+#ifdef HAVE_LIBCPP
+DEFINED("HAVE_LIBCPP")
 #endif
 
 #ifdef HAVE_NX_LIBS
@@ -134,6 +143,13 @@ DEFINED("HAVE_ARM64")
 DEFINED("HAVE_ARM")
 #endif
 
+#ifdef HAVE_S390X
+DEFINED("HAVE_S390X")
+#endif
+#ifdef HAVE_PPC64
+DEFINED("HAVE_PPC64")
+#endif
+
 #ifdef HAVE_XGETBV
 DEFINED("HAVE_XGETBV")
 #endif
@@ -151,8 +167,8 @@ DEFINED("HAVE_XCPU_ASSEMBLY")
 DEFINED("HAVE_ARM_ASSEMBLY")
 #endif
 
-#ifdef HAVE_SSE4
-DEFINED("HAVE_SSE4")
+#ifdef HAVE_SSE41
+DEFINED("HAVE_SSE41")
 #endif
 #ifdef HAVE_AVX2
 DEFINED("HAVE_AVX2")
@@ -163,15 +179,70 @@ DEFINED("HAVE_AVX512")
 #ifdef HAVE_SHANI
 DEFINED("HAVE_SHANI")
 #endif
+#ifdef HAVE_SHANI512
+DEFINED("HAVE_SHANI512")
+#endif
+#ifdef HAVE_AVX512IFMA
+DEFINED("HAVE_AVX512IFMA")
+#endif
+#ifdef HAVE_AVXIFMA
+DEFINED("HAVE_AVXIFMA")
+#endif
+#ifdef HAVE_AESNI
+DEFINED("HAVE_AESNI")
+#endif
+#ifdef HAVE_VAES
+DEFINED("HAVE_VAES")
+#endif
+#ifdef HAVE_X86_64_V2
+DEFINED("HAVE_X86_64_V2")
+#endif
+#ifdef HAVE_X86_64_V3
+DEFINED("HAVE_X86_64_V3")
+#endif
+
+#ifdef HAVE_128
+DEFINED("HAVE_128")
+#endif
+#ifdef HAVE_256
+DEFINED("HAVE_256")
+#endif
+#ifdef HAVE_512
+DEFINED("HAVE_512")
+#endif
+#ifdef HAVE_SHA
+DEFINED("HAVE_SHA")
+#endif
+#ifdef HAVE_SHA512
+DEFINED("HAVE_SHA512")
+#endif
+#ifdef HAVE_AES
+DEFINED("HAVE_AES")
+#endif
+#ifdef HAVE_IFMA_128
+DEFINED("HAVE_IFMA_128")
+#endif
+#ifdef HAVE_IFMA_256
+DEFINED("HAVE_IFMA_256")
+#endif
+#ifdef HAVE_IFMA_512
+DEFINED("HAVE_IFMA_512")
+#endif
 
 #ifdef HAVE_NEON
 DEFINED("HAVE_NEON")
 #endif
-#ifdef HAVE_SVE
-DEFINED("HAVE_SVE")
+#ifdef HAVE_NEON_SHA
+DEFINED("HAVE_NEON_SHA")
 #endif
-#ifdef HAVE_CRYPTO
-DEFINED("HAVE_CRYPTO")
+#ifdef HAVE_NEON_AES
+DEFINED("HAVE_NEON_AES")
+#endif
+#ifdef HAVE_NEON_SHA3
+DEFINED("HAVE_NEON_SHA3")
+#endif
+#ifdef HAVE_LSE
+DEFINED("HAVE_LSE")
 #endif
 
 #ifdef HAVE_VS2013
@@ -206,12 +277,15 @@ DEFINED("HAVE_CPP17")
 DEFINED("HAVE_CPP20")
 #endif
 
-#ifdef HAVE_MEMORY_PRIORITY
-DEFINED("HAVE_MEMORY_PRIORITY")
+#ifdef HAVE_SECP256K1
+DEFINED("HAVE_SECP256K1")
 #endif
 
-#ifdef HAVE_ULTRAFAST
-DEFINED("HAVE_ULTRAFAST")
+#ifdef HAVE_PTX
+DEFINED("HAVE_PTX")
+#endif
+#ifdef HAVE_CUDA
+DEFINED("HAVE_CUDA")
 #endif
 
 // These messages are suppressed without this.

@@ -22,10 +22,12 @@
 #include <bitcoin/system/error/block_error_t.hpp>
 #include <bitcoin/system/error/error_t.hpp>
 #include <bitcoin/system/error/errorno_t.hpp>
+#include <bitcoin/system/error/json_error_t.hpp>
 #include <bitcoin/system/error/macros.hpp>
 #include <bitcoin/system/error/op_error_t.hpp>
 #include <bitcoin/system/error/script_error_t.hpp>
 #include <bitcoin/system/error/transaction_error_t.hpp>
+#include <bitcoin/system/error/x509_error_t.hpp>
 
 #include <system_error>
 

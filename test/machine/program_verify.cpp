@@ -19,7 +19,7 @@
 #include "../test.hpp"
 #include "accessor.hpp"
 
-BOOST_AUTO_TEST_SUITE(program_verify_tests)
+BC_AUTO_TEST_SUITE(program_verify_tests)
 
 using namespace system::chain;
 using namespace system::machine;
@@ -43,47 +43,61 @@ static transaction funded_tx() NOEXCEPT
     return tx;
 }
 
-BOOST_AUTO_TEST_CASE(program__subscript__segwit_bip143__unstripped)
+BC_AUTO_TEST_CASE(program__subscript__segwit_bip143__unstripped)
 {
     const operations ops{ operation{ opcode::codeseparator } };
     const auto separator = to_shared<script>(script{ ops });
     const auto tx = funded_tx();
-    const auto it = tx.inputs_ptr()->begin();
+    const auto it = tx.inputs_ptr()->cbegin();
     const auto stack = std::make_shared<chunk_cptrs>();
     const chain::signatures capture{};
     const verify_accessor out{ tx, it, separator, flags::bip143_rule, script_version::segwit, stack, capture };
 
     const data_chunk endorsement{ 0x01_u8 };
     const chunk_xptr single{ endorsement };
-    BOOST_REQUIRE(out.subscript(single) == separator);
-    BOOST_REQUIRE(out.subscript(chunk_xptrs{ single }) == separator);
+    BC_REQUIRE(out.subscript(single) == separator);
+    BC_REQUIRE(out.subscript(chunk_xptrs{ single }) == separator);
 }
 
-BOOST_AUTO_TEST_CASE(program__subscript__codeseparator__stripped)
+BC_AUTO_TEST_CASE(program__subscript__codeseparator__stripped)
 {
     const operations ops{ operation{ opcode::codeseparator }, operation{ opcode::dup } };
     const auto tx = accessor_transaction(script{ ops }, max_input_sequence, 0, 1);
-    const auto it = tx.inputs_ptr()->begin();
+    const auto it = tx.inputs_ptr()->cbegin();
     const chain::signatures capture{};
     const verify_accessor in{ tx, it, flags::no_rules, capture };
 
     const data_chunk endorsement{ 0x01_u8 };
     const chunk_xptr single{ endorsement };
-    BOOST_REQUIRE_EQUAL(in.subscript(single)->ops().size(), one);
-    BOOST_REQUIRE_EQUAL(in.subscript(chunk_xptrs{ single })->ops().size(), one);
+    BC_REQUIRE_EQUAL(in.subscript(single)->ops().size(), one);
+    BC_REQUIRE_EQUAL(in.subscript(chunk_xptrs{ single })->ops().size(), one);
 }
 
-BOOST_AUTO_TEST_CASE(program__set_hash__subscript__cached)
+BC_AUTO_TEST_CASE(program__subscript__unversioned_bip143__stripped)
+{
+    const operations ops{ operation{ opcode::codeseparator }, operation{ opcode::dup } };
+    const auto tx = accessor_transaction(script{ ops }, max_input_sequence, 0, 1);
+    const auto it = tx.inputs_ptr()->cbegin();
+    const chain::signatures capture{};
+    const verify_accessor in{ tx, it, flags::bip143_rule, capture };
+
+    const data_chunk endorsement{ 0x01_u8 };
+    const chunk_xptr single{ endorsement };
+    BC_REQUIRE_EQUAL(in.subscript(single)->ops().size(), one);
+    BC_REQUIRE_EQUAL(in.subscript(chunk_xptrs{ single })->ops().size(), one);
+}
+
+BC_AUTO_TEST_CASE(program__set_hash__subscript__cached)
 {
     const chain::signatures capture{};
     const auto tx = accessor_transaction(script{}, max_input_sequence, 0, 1);
-    const auto it = tx.inputs_ptr()->begin();
+    const auto it = tx.inputs_ptr()->cbegin();
     const verify_accessor in{ tx, it, flags::no_rules, capture };
     const script subscript{ operations{ operation{ opcode::checksig } } };
-    BOOST_REQUIRE(!in.cached(coverage::hash_all));
+    BC_REQUIRE(!in.cached(coverage::hash_all));
     in.set_hash(subscript, coverage::hash_all);
-    BOOST_REQUIRE(in.cached(coverage::hash_all));
+    BC_REQUIRE(in.cached(coverage::hash_all));
 }
 
-BOOST_AUTO_TEST_SUITE_END()
+BC_AUTO_TEST_SUITE_END()
 

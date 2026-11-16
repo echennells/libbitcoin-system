@@ -18,7 +18,7 @@
  */
 #include <bitcoin/system/unicode/utf8_everywhere/paths.hpp>
 
-#ifdef HAVE_MSC
+#ifdef HAVE_WINDOWS
     #include <shlobj.h>
     #include <windows.h>
 #endif
@@ -28,6 +28,10 @@
 #endif
 #ifdef HAVE_APPLE
     #include <mach-o/dyld.h>
+#endif
+#if defined(HAVE_FREEBSD) || defined(HAVE_NETBSD)
+    #include <sys/types.h>
+    #include <sys/sysctl.h>
 #endif
 #include <filesystem>
 #include <system_error>
@@ -66,7 +70,7 @@ std::filesystem::path to_path(const std::string& value) NOEXCEPT
     BC_POP_WARNING()
 }
 
-#if defined(HAVE_MSC)
+#if defined(HAVE_WINDOWS)
 static std::wstring config_directory() NOEXCEPT
 {
     wchar_t directory[MAX_PATH];
@@ -89,7 +93,7 @@ std::filesystem::path default_config_path(
     BC_POP_WARNING()
 }
 
-#if defined(HAVE_MSC)
+#if defined(HAVE_WINDOWS)
 
 // Helper for qualified_path.
 inline auto replace_all(std::wstring text, wchar_t from, wchar_t to) NOEXCEPT
@@ -166,8 +170,10 @@ std::filesystem::path module_path() NOEXCEPT
 
         if (length < size)
         {
+            // The path may contain relative segments, so qualify it.
             BC_PUSH_WARNING(NO_THROW_IN_NOEXCEPT)
-            return { buffer.cbegin(), std::next(buffer.cbegin(), length) };
+            return qualified_path({ buffer.cbegin(),
+                std::next(buffer.cbegin(), length) });
             BC_POP_WARNING()
         }
     }
@@ -223,13 +229,33 @@ std::filesystem::path module_path() NOEXCEPT
 
     // The path may be a symlink or contain relative segments, so qualify it.
     return qualified_path({ std::string{ buffer.data() } });
+#elif defined(HAVE_FREEBSD) || defined(HAVE_NETBSD)
+#if defined(HAVE_FREEBSD)
+    const std::array<int, 4> name{ CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1 };
+#else
+    const std::array<int, 4> name{ CTL_KERN, KERN_PROC_ARGS, -1, KERN_PROC_PATHNAME };
+#endif
+
+    // The call populates the size when the buffer is null.
+    const auto count = possible_narrow_cast<u_int>(name.size());
+    size_t size{};
+    if (!is_zero(::sysctl(name.data(), count, nullptr, &size, nullptr, 0)) ||
+        is_zero(size))
+        return {};
+
+    std::vector<char> buffer(size);
+    if (!is_zero(::sysctl(name.data(), count, buffer.data(), &size, nullptr,
+        0)))
+        return {};
+
+    return { std::string{ buffer.data() } };
 #else
     return {};
 #endif
     BC_POP_WARNING()
 }
 
-#endif // HAVE_MSC
+#endif // HAVE_WINDOWS
 
 } // namespace system
 } // namespace libbitcoin

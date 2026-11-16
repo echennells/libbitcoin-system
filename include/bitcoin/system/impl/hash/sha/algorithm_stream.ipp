@@ -40,8 +40,19 @@ TEMPLATE
 constexpr void CLASS::
 accumulate(state_t& state, const block_t& block) NOEXCEPT
 {
-    // As an array of a 1 arrays is the same as the array, this compiles away.
-    iterate(state, ablocks_t<one>{ block });
+    if (std::is_constant_evaluated())
+    {
+        iterate(state, ablocks_t<one>{ block });
+    }
+    else if constexpr (native)
+    {
+        native_transform<true>(state, block);
+    }
+    else
+    {
+        // As an array of a 1 arrays is the same as the array, this compiles away.
+        iterate(state, ablocks_t<one>{ block });
+    }
 }
 
 TEMPLATE
@@ -119,8 +130,7 @@ finalize_second(const state_t& state) NOEXCEPT
         buffer_t buffer{};
         inject_left_half(buffer, state);
         pad_half(buffer);
-        schedule(buffer);
-        compress(state2, buffer);
+        schedule_compress(state2, buffer);
         return output(state2);
     };
 
@@ -153,9 +163,7 @@ finalize_double(state_t& state, size_t blocks) NOEXCEPT
         auto state2 = H::get;
         inject_left_half(buffer, state);
         pad_half(buffer);
-        schedule(buffer);
-        compress(state2, buffer);
-
+        schedule_compress(state2, buffer);
         return output(state2);
     };
 

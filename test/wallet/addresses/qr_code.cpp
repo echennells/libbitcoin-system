@@ -18,7 +18,7 @@
  */
 #include "../../test.hpp"
 
-BOOST_AUTO_TEST_SUITE(qr_code_tests)
+BC_AUTO_TEST_SUITE(qr_code_tests)
 
 using namespace bc::system::wallet;
 
@@ -29,224 +29,208 @@ static const uint16_t no_margin = 0u;
 static const uint8_t default_version = 0u;
 static const auto low = qr_code::recovery_level::low;
 
-BOOST_AUTO_TEST_CASE(qr_code__encode__no_value__false)
+// The inflated image data (scanlines) of a png of one image data chunk.
+static data_chunk scanlines(const data_chunk& png)
 {
-    data_chunk out;
-    stream::out::data sink(out);
-    BOOST_REQUIRE(!qr_code::encode(sink, ""));
+    constexpr size_t field = sizeof(uint32_t);
+    const std::string type{ "IDAT" };
+    const auto it = std::search(png.begin(), png.end(), type.begin(),
+        type.end());
+
+    const data_chunk length(std::prev(it, field), it);
+    const auto begin = std::next(it, field);
+    const auto end = std::next(begin, from_big_endian<uint32_t>(length));
+
+    data_chunk out{};
+    zlib_inflate(out, data_chunk(begin, end));
+    return out;
 }
 
-BOOST_AUTO_TEST_CASE(qr_code__encode__excessive_character_value__false)
+BC_AUTO_TEST_CASE(qr_code__encode__no_value__false)
+{
+    data_chunk out;
+    stream::out::data sink(out);
+    BC_REQUIRE(!qr_code::encode(sink, ""));
+}
+
+BC_AUTO_TEST_CASE(qr_code__encode__excessive_character_value__false)
 {
     data_chunk out;
     stream::out::data sink(out);
 
-    // ERANGE returned by qrencode.
     std::string value(bc::max_uint16, 0x42);
-    BOOST_REQUIRE(!qr_code::encode(sink, value));
+    BC_REQUIRE(!qr_code::encode(sink, value));
 }
 
-BOOST_AUTO_TEST_CASE(qr_code__encode__one_character_version_0_scale_1_margin_0__expected)
+BC_AUTO_TEST_CASE(qr_code__encode__one_character_version_0_scale_1_margin_0__expected)
 {
     static const data_chunk expected
     {
-        // TIFF metadata.
-        0x4d, 0x4d,             // "MM" - Motorola encoding (big endian).
-        0x00, 0x2a,             // Arbitrary delimeter (42).
-        0x00, 0x00, 0x00, 0x08, // Offset of IFD[0].
-
-        // [Each directory may be anywhere in the file]
-
-        // Number of IFD[0] entries, word boundary required.
-        0x00, 0x0a,
-
-        // IFD[0] entries.
-        0x01, 0x00,             // image_width
-        0x00, 0x04,             // 32 bit value
-        0x00, 0x00, 0x00, 0x01, // 1 value
-        0x00, 0x00, 0x00, 0x15, // 21 pixels wide (column count)
-        
-        0x01, 0x01,             // image_length
-        0x00, 0x04,             // 32 bit value
-        0x00, 0x00, 0x00, 0x01, // 1 value
-        0x00, 0x00, 0x00, 0x15, // 21 pixels high (row count)
-        
-        0x01, 0x03,             // compression
-        0x00, 0x03,             // 16 bit value
-        0x00, 0x00, 0x00, 0x01, // 1 value
-        0x00, 0x01,             // compression_mode::none
-        0x00, 0x00,             // padding
-        
-        0x01, 0x06,             // photometric_interpretation
-        0x00, 0x03,             // 16 bit value
-        0x00, 0x00, 0x00, 0x01, // 1 value
-        0x00, 0x00,             // zero_color::white
-        0x00, 0x00,             // padding
-        
-        0x01, 0x11,             // strip_offsets
-        0x00, 0x04,             // 32 bit value
-        0x00, 0x00, 0x00, 0x01, // 1 value
-        0x00, 0x00, 0x00, 0x9c, // offset to value
-        
-        0x01, 0x16,             // rows_per_strip
-        0x00, 0x04,             // 32 bit value
-        0x00, 0x00, 0x00, 0x01, // 1 value
-        0x00, 0x00, 0x00, 0x15, // 21 rows per (1) strip
-        
-        0x01, 0x17,             // strip_byte_counts
-        0x00, 0x04,             // 32 bit value
-        0x00, 0x00, 0x00, 0x01, // 1 value
-        0x00, 0x00, 0x00, 0x3f, // 63 bytes per (1) strip
-        
-        0x01, 0x1a,             // x_resolution
-        0x00, 0x05,             // 64 bit value
-        0x00, 0x00, 0x00, 0x01, // 1 value
-        0x00, 0x00, 0x00, 0x88, // offset to value
-        
-        0x01, 0x1b,             // y_resolution
-        0x00, 0x05,             // 64 bit value
-        0x00, 0x00, 0x00, 0x01, // 1 value
-        0x00, 0x00, 0x00, 0x90, // offset to value
-        
-        0x01, 0x28,             // resolution_unit
-        0x00, 0x03,             // 16 bit value
-        0x00, 0x00, 0x00, 0x01, // 1 value
-        0x00, 0x01,             // resolution_units::pixels_per_inch
-        0x00, 0x00,             // padding
-
-        // Linked IFD list terminator.
-        0x00, 0x00, 0x00, 0x00,
-
-        // Pad to get offsets onto word boundaries.
-        0x00, 0x00,
-        
-        // x_resolution data [numerator][denominator]
-        0x00, 0x00, 0x00, 0x48,
-        0x00, 0x00, 0x00, 0x01,
-
-        // y_resolution data [numerator][denominator]
-        0x00, 0x00, 0x00, 0x48,
-        0x00, 0x00, 0x00, 0x01,
-
-        // Libbitcoin data delimiter.
-        0xba, 0xad, 0xf0, 0x0d,
-
-        // [Image strips may be anywhere in the file.]
-
-        // Image data.
-        // 21 pixels per row = 3 bytes per padded row.
-        // 21 rows * 3 bytes per row = 63 bytes = 15 * 4 + 3.
-        0xfe, 0x5b, 0xf8, 0x82,
-        0x72, 0x08, 0xba, 0xda,
-        0xe8, 0xba, 0x52, 0xe8,
-        0xba, 0x2a, 0xe8, 0x82,
-        0x0a, 0x08, 0xfe, 0xab,
-        0xf8, 0x00, 0xd8, 0x00,
-        0xef, 0xf6, 0x20, 0x31,
-        0x02, 0x30, 0xbf, 0xa8,
-        0x88, 0x20, 0x02, 0x38,
-        0x0e, 0xea, 0xa8, 0x00,
-        0x95, 0x50, 0xfe, 0x97,
-        0x70, 0x82, 0xbd, 0xd0,
-        0xba, 0xb7, 0x68, 0xba,
-        0x02, 0x30, 0xba, 0x88,
-        0x88, 0x82, 0xe2, 0x38,
-        0xfe, 0xca, 0xa8
+        // PNG signature, header, image data and trailer.
+        0x89, 0x50, 0x4e, 0x47,
+        0x0d, 0x0a, 0x1a, 0x0a,
+        0x00, 0x00, 0x00, 0x0d,
+        0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x15,
+        0x00, 0x00, 0x00, 0x15,
+        0x01, 0x00, 0x00, 0x00,
+        0x00, 0x81, 0x6c, 0x98,
+        0x3b, 0x00, 0x00, 0x00,
+        0x5c, 0x49, 0x44, 0x41,
+        0x54, 0x78, 0x9c, 0x63,
+        0x60, 0x5c, 0xc2, 0xce,
+        0x50, 0xdb, 0xfb, 0x9d,
+        0xc1, 0x55, 0x55, 0x9c,
+        0xc1, 0x75, 0x2d, 0x10,
+        0x5f, 0x15, 0x67, 0xa8,
+        0xfd, 0xfa, 0x9d, 0x81,
+        0x31, 0x84, 0x9d, 0xe1,
+        0xbf, 0xfa, 0x7f, 0x06,
+        0x01, 0xce, 0xfb, 0x0c,
+        0xe7, 0xfe, 0x9e, 0x67,
+        0x70, 0x08, 0x2f, 0x67,
+        0xb8, 0xff, 0xf7, 0x38,
+        0xc3, 0x47, 0xd1, 0x70,
+        0x86, 0xff, 0x59, 0xeb,
+        0x19, 0x18, 0x33, 0xfa,
+        0x19, 0x6a, 0x9d, 0xf4,
+        0x19, 0x5c, 0x3d, 0xa6,
+        0x33, 0xb8, 0x02, 0xe5,
+        0x5d, 0xcb, 0xcb, 0x19,
+        0x6a, 0x65, 0x8f, 0x33,
+        0x30, 0x9a, 0x86, 0x03,
+        0x00, 0xc6, 0x3f, 0x1d,
+        0x47, 0xdf, 0x18, 0x39,
+        0x73, 0x00, 0x00, 0x00,
+        0x00, 0x49, 0x45, 0x4e,
+        0x44, 0xae, 0x42, 0x60,
+        0x82
     };
 
     data_chunk out;
     stream::out::data sink(out);
-    BOOST_REQUIRE(qr_code::encode(sink, "X", default_version, 1, no_margin));
+    BC_REQUIRE(qr_code::encode(sink, "X", default_version, 1, no_margin));
 
     // Encode as base16 so that failure message is intelligible.
-    BOOST_REQUIRE_EQUAL(encode_base16(out), encode_base16(expected));
+    BC_REQUIRE_EQUAL(encode_base16(out), encode_base16(expected));
 }
 
-BOOST_AUTO_TEST_CASE(qr_code__encode__invalid_version__false)
+BC_AUTO_TEST_CASE(qr_code__encode__invalid_version__false)
 {
     data_chunk out;
     stream::out::data sink(out);
 
-    // EINVAL returned by qrencode.
-    BOOST_REQUIRE(!qr_code::encode(sink, "X", qr_code::maximum_version + 1u));
+    BC_REQUIRE(!qr_code::encode(sink, "X", qr_code::maximum_version + 1u));
 }
 
-BOOST_AUTO_TEST_CASE(qr_code__encode__maximum_version__expected_size)
+BC_AUTO_TEST_CASE(qr_code__encode__maximum_version__expected_size)
 {
     data_chunk out;
     stream::out::data sink(out);
-    BOOST_REQUIRE(qr_code::encode(sink, "X", qr_code::maximum_version));
-    BOOST_REQUIRE_EQUAL(out.size(), 252916u);
+    BC_REQUIRE(qr_code::encode(sink, "X", qr_code::maximum_version));
+    BC_REQUIRE_EQUAL(scanlines(out).size(), 254180u);
 }
 
-BOOST_AUTO_TEST_CASE(qr_code__encode__excessive_margin__false)
+BC_AUTO_TEST_CASE(qr_code__encode__excessive_margin__false)
 {
     data_chunk out;
     stream::out::data sink(out);
 
     // At scale 0, (2 * (2^16 - 1))^2 > (2^32 - 1), the TIFF pixel limit. 
-    BOOST_REQUIRE(!qr_code::encode(sink, "X", default_version, no_scale, bc::max_uint16));
+    BC_REQUIRE(!qr_code::encode(sink, "X", default_version, no_scale, bc::max_uint16));
 }
 
-BOOST_AUTO_TEST_CASE(qr_code__encode__excessive_scale__false)
+BC_AUTO_TEST_CASE(qr_code__encode__excessive_scale__false)
 {
     data_chunk out;
     stream::out::data sink(out);
 
     // At margin 0, scaling even a single pixel to 2^16 overflows the TIFF pixel limit.
-    BOOST_REQUIRE(!qr_code::encode(sink, "X", default_version, bc::max_uint16, no_margin));
+    BC_REQUIRE(!qr_code::encode(sink, "X", default_version, bc::max_uint16, no_margin));
 }
 
 // recovery_level
 
-BOOST_AUTO_TEST_CASE(qr_code__encode__recovery_level_low__expected_size)
+BC_AUTO_TEST_CASE(qr_code__encode__recovery_level_low__expected_size)
 {
     data_chunk out;
     stream::out::data sink(out);
-    BOOST_REQUIRE(qr_code::encode(sink, "X", default_version, 1, no_margin, qr_code::recovery_level::low));
-    BOOST_REQUIRE_EQUAL(out.size(), 219u);
+    BC_REQUIRE(qr_code::encode(sink, "X", default_version, 1, no_margin, qr_code::recovery_level::low));
+    BC_REQUIRE_EQUAL(scanlines(out).size(), 84u);
 }
 
-BOOST_AUTO_TEST_CASE(qr_code__encode__recovery_level_medium__expected_size)
+BC_AUTO_TEST_CASE(qr_code__encode__recovery_level_medium__expected_size)
 {
     data_chunk out;
     stream::out::data sink(out);
-    BOOST_REQUIRE(qr_code::encode(sink, "X", default_version, 1, no_margin, qr_code::recovery_level::medium));
-    BOOST_REQUIRE_EQUAL(out.size(), 219u);
+    BC_REQUIRE(qr_code::encode(sink, "X", default_version, 1, no_margin, qr_code::recovery_level::medium));
+    BC_REQUIRE_EQUAL(scanlines(out).size(), 84u);
 }
 
-BOOST_AUTO_TEST_CASE(qr_code__encode__recovery_level_high__expected_size)
+BC_AUTO_TEST_CASE(qr_code__encode__recovery_level_high__expected_size)
 {
     data_chunk out;
     stream::out::data sink(out);
-    BOOST_REQUIRE(qr_code::encode(sink, "X", default_version, 1, no_margin, qr_code::recovery_level::high));
-    BOOST_REQUIRE_EQUAL(out.size(), 219u);
+    BC_REQUIRE(qr_code::encode(sink, "X", default_version, 1, no_margin, qr_code::recovery_level::high));
+    BC_REQUIRE_EQUAL(scanlines(out).size(), 84u);
 }
 
-BOOST_AUTO_TEST_CASE(qr_code__encode__recovery_level_highest__expected_size)
+BC_AUTO_TEST_CASE(qr_code__encode__recovery_level_highest__expected_size)
 {
     data_chunk out;
     stream::out::data sink(out);
-    BOOST_REQUIRE(qr_code::encode(sink, "X", default_version, 1, no_margin, qr_code::recovery_level::highest));
-    BOOST_REQUIRE_EQUAL(out.size(), 219u);
+    BC_REQUIRE(qr_code::encode(sink, "X", default_version, 1, no_margin, qr_code::recovery_level::highest));
+    BC_REQUIRE_EQUAL(scanlines(out).size(), 84u);
 }
 
 // encode_mode
 
-BOOST_AUTO_TEST_CASE(qr_code__encode__encode_mode_eight_bit__expected_size)
+BC_AUTO_TEST_CASE(qr_code__encode__encode_mode_eight_bit__expected_size)
 {
     data_chunk out;
     stream::out::data sink(out);
-    BOOST_REQUIRE(qr_code::encode(sink, "X", default_version, 1, no_margin, low, qr_code::encode_mode::eight_bit));
-    BOOST_REQUIRE_EQUAL(out.size(), 219u);
+    BC_REQUIRE(qr_code::encode(sink, "X", default_version, 1, no_margin, low, qr_code::encode_mode::eight_bit));
+    BC_REQUIRE_EQUAL(scanlines(out).size(), 84u);
 }
 
-BOOST_AUTO_TEST_CASE(qr_code__encode__encode_mode_kanji__expected_size)
+BC_AUTO_TEST_CASE(qr_code__encode__encode_mode_kanji__expected_size)
 {
     data_chunk out;
     stream::out::data sink(out);
-    BOOST_REQUIRE(qr_code::encode(sink, "X", default_version, 1, no_margin, low, qr_code::encode_mode::kanji));
-    BOOST_REQUIRE_EQUAL(out.size(), 219u);
+    BC_REQUIRE(qr_code::encode(sink, "X", default_version, 1, no_margin, low, qr_code::encode_mode::kanji));
+    BC_REQUIRE_EQUAL(scanlines(out).size(), 84u);
+}
+
+// to_modules
+
+BC_AUTO_TEST_CASE(qr_code__to_modules__empty__empty_zero_width)
+{
+    size_t width{ 42 };
+    BC_REQUIRE(qr_code::to_modules(width, "").empty());
+    BC_REQUIRE_EQUAL(width, 0u);
+}
+
+BC_AUTO_TEST_CASE(qr_code__to_modules__invalid_version__empty_zero_width)
+{
+    size_t width{ 42 };
+    BC_REQUIRE(qr_code::to_modules(width, "X", qr_code::maximum_version + 1u).empty());
+    BC_REQUIRE_EQUAL(width, 0u);
+}
+
+BC_AUTO_TEST_CASE(qr_code__to_modules__one_character__version_1)
+{
+    size_t width{};
+    const auto modules = qr_code::to_modules(width, "X");
+    BC_REQUIRE_EQUAL(width, 21u);
+    BC_REQUIRE_EQUAL(modules.size(), 441u);
+}
+
+BC_AUTO_TEST_CASE(qr_code__to_modules__minimum_version__minimum_version_width)
+{
+    size_t width{};
+    const auto modules = qr_code::to_modules(width, "X", 7);
+    BC_REQUIRE_EQUAL(width, 45u);
+    BC_REQUIRE_EQUAL(modules.size(), 2025u);
 }
 
 // to_pixels
@@ -262,7 +246,7 @@ public:
     }
 };
 
-BOOST_AUTO_TEST_CASE(qr_code__to_pixels__no_image_scale_0_margin_0__empty)
+BC_AUTO_TEST_CASE(qr_code__to_pixels__no_image_scale_0_margin_0__empty)
 {
     // No image with no margin creates empty result (success).
     static const data_chunk expected{};
@@ -271,10 +255,10 @@ BOOST_AUTO_TEST_CASE(qr_code__to_pixels__no_image_scale_0_margin_0__empty)
     const auto pixels = qr_code_accessor::to_pixels(data, 0, 0, 0);
 
     // Encode as base16 so that failure message is intelligible.
-    BOOST_REQUIRE_EQUAL(encode_base16(pixels), encode_base16(expected));
+    BC_REQUIRE_EQUAL(encode_base16(pixels), encode_base16(expected));
 }
 
-BOOST_AUTO_TEST_CASE(qr_code__to_pixels__no_image_scale_8_margin_2__expected)
+BC_AUTO_TEST_CASE(qr_code__to_pixels__no_image_scale_8_margin_2__expected)
 {
     // A 2 pixel margin on no image creates 16 zeroed pixels.
     static const data_chunk expected{ 0x00, 0x00, 0x00, 0x00 };
@@ -283,10 +267,10 @@ BOOST_AUTO_TEST_CASE(qr_code__to_pixels__no_image_scale_8_margin_2__expected)
     const auto pixels = qr_code_accessor::to_pixels(data, 0, 8, 2);
 
     // Encode as base16 so that failure message is intelligible.
-    BOOST_REQUIRE_EQUAL(encode_base16(pixels), encode_base16(expected));
+    BC_REQUIRE_EQUAL(encode_base16(pixels), encode_base16(expected));
 }
 
-BOOST_AUTO_TEST_CASE(qr_code__to_pixels__one_pixel_scale_0_margin_0__empty)
+BC_AUTO_TEST_CASE(qr_code__to_pixels__one_pixel_scale_0_margin_0__empty)
 {
     // Scale zero creates a no image if there is no margin specified.
     static const data_chunk expected{};
@@ -296,10 +280,10 @@ BOOST_AUTO_TEST_CASE(qr_code__to_pixels__one_pixel_scale_0_margin_0__empty)
     const auto pixels = qr_code_accessor::to_pixels(data, 1, 0, 0);
 
     // Encode as base16 so that failure message is intelligible.
-    BOOST_REQUIRE_EQUAL(encode_base16(pixels), encode_base16(expected));
+    BC_REQUIRE_EQUAL(encode_base16(pixels), encode_base16(expected));
 }
 
-BOOST_AUTO_TEST_CASE(qr_code__to_pixels__one_pixel_scale_1_margin_0__expected)
+BC_AUTO_TEST_CASE(qr_code__to_pixels__one_pixel_scale_1_margin_0__expected)
 {
     // Scale 1 does not expand. A single pixel image with no margin creates a
     // one byte image with only the most significant bit set to 1.
@@ -310,10 +294,10 @@ BOOST_AUTO_TEST_CASE(qr_code__to_pixels__one_pixel_scale_1_margin_0__expected)
     const auto pixels = qr_code_accessor::to_pixels(data, 1, 1, 0);
 
     // Encode as base16 so that failure message is intelligible.
-    BOOST_REQUIRE_EQUAL(encode_base16(pixels), encode_base16(expected));
+    BC_REQUIRE_EQUAL(encode_base16(pixels), encode_base16(expected));
 }
 
-BOOST_AUTO_TEST_CASE(qr_code__to_pixels__one_pixel_scale_1_margin_1__expected)
+BC_AUTO_TEST_CASE(qr_code__to_pixels__one_pixel_scale_1_margin_1__expected)
 {
     // Scale 1 does not expand. A single pixel image with single pixel margin
     // creates a 9 pixel image with the 5th most significant bit set to 1,
@@ -325,10 +309,10 @@ BOOST_AUTO_TEST_CASE(qr_code__to_pixels__one_pixel_scale_1_margin_1__expected)
     const auto pixels = qr_code_accessor::to_pixels(data, 1, 1, 1);
 
     // Encode as base16 so that failure message is intelligible.
-    BOOST_REQUIRE_EQUAL(encode_base16(pixels), encode_base16(expected));
+    BC_REQUIRE_EQUAL(encode_base16(pixels), encode_base16(expected));
 }
 
-BOOST_AUTO_TEST_CASE(qr_code__to_pixels__endianness_independent__expected)
+BC_AUTO_TEST_CASE(qr_code__to_pixels__endianness_independent__expected)
 {
     // Area is 2x2px so image is scaled to 4x4px and 2px margin makes it 8x8px.
     static const data_chunk expected
@@ -359,10 +343,10 @@ BOOST_AUTO_TEST_CASE(qr_code__to_pixels__endianness_independent__expected)
     const auto pixels = qr_code_accessor::to_pixels(data, 2, 2, 2);
 
     // Encode as base16 so that failure message is intelligible.
-    BOOST_REQUIRE_EQUAL(encode_base16(pixels), encode_base16(expected));
+    BC_REQUIRE_EQUAL(encode_base16(pixels), encode_base16(expected));
 }
 
-BOOST_AUTO_TEST_CASE(qr_code__to_pixels__little_endian_dependent__expected)
+BC_AUTO_TEST_CASE(qr_code__to_pixels__little_endian_dependent__expected)
 {
     // Area is 2x2px so image is scaled to 4x4px and 2px margin makes it 8x8px.
     static const data_chunk expected
@@ -392,14 +376,14 @@ BOOST_AUTO_TEST_CASE(qr_code__to_pixels__little_endian_dependent__expected)
     const auto pixels = qr_code_accessor::to_pixels(data, 2, 2, 2);
 
     // Encode as base16 so that failure message is intelligible.
-    BOOST_REQUIRE_EQUAL(encode_base16(pixels), encode_base16(expected));
+    BC_REQUIRE_EQUAL(encode_base16(pixels), encode_base16(expected));
 }
 
 
-BOOST_AUTO_TEST_CASE(qr_code__to_pixels__size_mismatch__empty)
+BC_AUTO_TEST_CASE(qr_code__to_pixels__size_mismatch__empty)
 {
     static const data_chunk data{ 0xff };
-    BOOST_REQUIRE(qr_code_accessor::to_pixels(data, 2, 8, 2).empty());
+    BC_REQUIRE(qr_code_accessor::to_pixels(data, 2, 8, 2).empty());
 }
 
-BOOST_AUTO_TEST_SUITE_END()
+BC_AUTO_TEST_SUITE_END()

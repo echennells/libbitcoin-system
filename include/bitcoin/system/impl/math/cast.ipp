@@ -159,11 +159,35 @@ constexpr To possible_wide_cast(From value) NOEXCEPT
     return value;
 }
 
+template <typename Size, if_same<Size, size_t>>
+constexpr uint32_t to32(Size value) NOEXCEPT
+{
+    return possible_narrow_cast<uint32_t>(value);
+}
+
+template <typename Size, if_same<Size, signed_size_t>>
+constexpr int32_t to32(Size value) NOEXCEPT
+{
+    return possible_narrow_cast<int32_t>(value);
+}
+
+template <typename Size, if_same<Size, size_t>>
+constexpr uint64_t to64(Size value) NOEXCEPT
+{
+    return possible_wide_cast<uint64_t>(value);
+}
+
+template <typename Size, if_same<Size, signed_size_t>>
+constexpr int64_t to64(Size value) NOEXCEPT
+{
+    return possible_wide_cast<int64_t>(value);
+}
+
 // Explicit pointer casts.
 // ----------------------------------------------------------------------------
 
 template <typename To, typename From>
-inline To* pointer_cast(From* value) NOEXCEPT
+HOST_DEVICE inline To* pointer_cast(From* value) NOEXCEPT
 {
     BC_PUSH_WARNING(NO_REINTERPRET_CAST)
     return reinterpret_cast<To*>(value);
@@ -171,7 +195,7 @@ inline To* pointer_cast(From* value) NOEXCEPT
 }
 
 template <typename To, typename From>
-inline To* possible_pointer_cast(From* value) NOEXCEPT
+HOST_DEVICE inline To* possible_pointer_cast(From* value) NOEXCEPT
 {
     BC_PUSH_WARNING(NO_IDENTITY_CAST)
     BC_PUSH_WARNING(NO_REINTERPRET_CAST)

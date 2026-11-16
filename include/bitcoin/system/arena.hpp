@@ -19,6 +19,9 @@
 #ifndef LIBBITCOIN_SYSTEM_ARENA_HPP
 #define LIBBITCOIN_SYSTEM_ARENA_HPP
 
+#include <cstddef>
+#include <memory_resource>
+#include <utility>
 #include <bitcoin/system/exceptions.hpp>
 
 namespace libbitcoin {
@@ -72,7 +75,7 @@ private:
 };
 
 /// Left can deallocate memory allocated by right and vice versa.
-bool operator==(const arena& left, const arena& right) NOEXCEPT;
+BC_API bool operator==(const arena& left, const arena& right) NOEXCEPT;
 
 /// ***************************************************************************
 /// BE AWARE of the risks of memory relocation. Generally speaking a custom

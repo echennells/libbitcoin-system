@@ -19,6 +19,7 @@
 #ifndef LIBBITCOIN_SYSTEM_SERIAL_DESERIALIZE_HPP
 #define LIBBITCOIN_SYSTEM_SERIAL_DESERIALIZE_HPP
 
+#include <charconv>
 #include <bitcoin/system/data/data.hpp>
 #include <bitcoin/system/define.hpp>
 
@@ -41,6 +42,9 @@ inline bool deserialize(std::string& out, const std::string_view& text) NOEXCEPT
 /// Specialize template because basic_ostream treats uint8_t as char.
 inline bool deserialize(uint8_t& out, const std::string_view& text) NOEXCEPT;
 
+/// Specialize char as the first character of the trimmed text.
+inline bool deserialize(char& out, const std::string_view& text) NOEXCEPT;
+
 /// Specialize data_array to base16 (avoids split).
 template <size_t Size>
 bool deserialize(data_array<Size>& out, const std::string_view& text) NOEXCEPT;
@@ -49,16 +53,15 @@ bool deserialize(data_array<Size>& out, const std::string_view& text) NOEXCEPT;
 inline bool deserialize(data_chunk& out, const std::string_view& text) NOEXCEPT;
 
 /// Specialize arrays to add space delimiter.
-template <typename Value, size_t Size>
-bool deserialize(std_array<Value, Size>& out,
-    const std::string_view& text) NOEXCEPT;
-
-/// Specialize arrays to add space delimiter.
 template <typename Value>
 bool deserialize(std_vector<Value>& out, const std::string_view& text) NOEXCEPT;
 
+/// Specialize integrals as decimal text.
+template <typename Integer, if_integral<Integer> = true>
+bool deserialize(Integer& out, const std::string_view& text) NOEXCEPT;
+
 /// General deserializer.
-template <typename Value>
+template <typename Value, if_non_integral<Value> = true>
 bool deserialize(Value& out, const std::string_view& text) NOEXCEPT;
 
 } // namespace system

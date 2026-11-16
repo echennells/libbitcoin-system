@@ -18,57 +18,62 @@
  */
 #include "ec_context.hpp"
 
-#include <secp256k1.h>
+#include <bitcoin/system/crypto/secp256k1.hpp>
 #include <bitcoin/system/define.hpp>
+
+#define EC_TEXT(value) #value
+#define EC_STRING(value) EC_TEXT(value)
 
 namespace libbitcoin {
 namespace system {
 
-// Protected constructor (abstract) base class.
+// Context.
 // ----------------------------------------------------------------------------
 
 ec_context::ec_context(int flags) NOEXCEPT
   : context_(secp256k1_context_create(flags))
 {
-    BC_ASSERT(context_ != nullptr);
+    BC_ASSERT(!is_null(context_));
 }
 
 ec_context::~ec_context() NOEXCEPT
 {
-    BC_ASSERT(context_ != nullptr);
-
     if (!is_null(context_))
         secp256k1_context_destroy(context_);
 }
 
-// Concrete type for signing init.
-// ----------------------------------------------------------------------------
-
-ec_context_sign::ec_context_sign() NOEXCEPT
-  : ec_context(SECP256K1_CONTEXT_SIGN)
+const secp256k1_context* ec_context::get() const NOEXCEPT
 {
+    return context_;
 }
+
+// Singletons.
+// ----------------------------------------------------------------------------
 
 const secp256k1_context* ec_context_sign::context() NOEXCEPT
 {
-    static ec_context_sign instance{};
-    static auto context = instance.context_;
-    return context;
-}
-
-// Concrete type for verification init.
-// ----------------------------------------------------------------------------
-
-ec_context_verify::ec_context_verify() NOEXCEPT
-  : ec_context(SECP256K1_CONTEXT_VERIFY)
-{
+    static const ec_context instance{ SECP256K1_CONTEXT_SIGN };
+    return instance.get();
 }
 
 const secp256k1_context* ec_context_verify::context() NOEXCEPT
 {
-    static ec_context_verify instance{};
-    static auto context = instance.context_;
-    return context;
+    static const ec_context instance{ SECP256K1_CONTEXT_VERIFY };
+    return instance.get();
+}
+
+// Dependency identifier.
+// ----------------------------------------------------------------------------
+
+std::string secp256k1_library() NOEXCEPT
+{
+#if defined(HAVE_SECP256K1)
+    return "internal";
+#elif defined(SECP256K1_VERSION)
+    return "libsecp256k1 " EC_STRING(SECP256K1_VERSION);
+#else
+    return "libsecp256k1";
+#endif
 }
 
 } // namespace system

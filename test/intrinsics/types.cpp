@@ -18,7 +18,7 @@
  */
 #include "../test.hpp"
 
-BOOST_AUTO_TEST_SUITE(intrinsics_types_tests)
+BC_AUTO_TEST_SUITE(intrinsics_types_tests)
 
 // extended types
 // ----------------------------------------------------------------------------
@@ -119,6 +119,19 @@ static_assert(is_defined<if_extended<xint512_t>>);
 static_assert(have<xint512_t> == have_512);
 static_assert(have<xint256_t> == have_256);
 static_assert(have<xint128_t> == have_128);
+
+// have_ifma
+// ----------------------------------------------------------------------------
+
+static_assert(have_ifma<xint512_t> == have_ifma_512);
+static_assert(have_ifma<xint256_t> == have_ifma_256);
+static_assert(have_ifma<xint128_t> == have_ifma_128);
+static_assert(!have_ifma_512 || have_512);
+static_assert(!have_ifma_256 || have_256);
+static_assert(!have_ifma_128 || have_128);
+static_assert(have_ifma_256 == (have_avx512ifma || have_avxifma));
+static_assert(have_ifma_128 == (have_avx512ifma || have_avxifma));
+static_assert(have_ifma_512 == (have_avx512ifma && have_avx512));
 
 // have_lanes
 // ----------------------------------------------------------------------------
@@ -290,4 +303,4 @@ static_assert(capacity<xint512_t, uint64_t, 2 * 4> == 1); // full
 static_assert(capacity<xint512_t, uint64_t, 3 * 4> == 0);
 ////static_assert(capacity<xint512_t, uint64_t, 0> == 0);
 
-BOOST_AUTO_TEST_SUITE_END()
+BC_AUTO_TEST_SUITE_END()

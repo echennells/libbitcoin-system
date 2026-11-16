@@ -1,13 +1,25 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+ |  Copyright (c) 2014-2026 libbitcoin-system developers (see COPYING).
+ |
+ |         GENERATED SOURCE CODE, DO NOT EDIT EXCEPT EXPERIMENTALLY
+ |
+ -->
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  
+
   <PropertyGroup>
-    <_PropertySheetDisplayName>x86 Settings</_PropertySheetDisplayName>
+    <_PropertySheetDisplayName>Win32 Settings</_PropertySheetDisplayName>
+    <Option-arch Condition="'$(Option-arch)' == ''">AdvancedVectorExtensions2</Option-arch>
   </PropertyGroup>
-  
+
   <ItemDefinitionGroup>
     <ClCompile>
       <PreprocessorDefinitions>WIN32;_WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <EnableEnhancedInstructionSet Condition="'$(PlatformToolset)' != 'ClangCL' And '$(Option-arch)' == 'StreamingSIMDExtensions'">StreamingSIMDExtensions</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(PlatformToolset)' != 'ClangCL' And '$(Option-arch)' == 'StreamingSIMDExtensions2'">StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(PlatformToolset)' != 'ClangCL' And '$(Option-arch)' == 'AdvancedVectorExtensions'">AdvancedVectorExtensions</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(PlatformToolset)' != 'ClangCL' And '$(Option-arch)' == 'AdvancedVectorExtensions2'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(PlatformToolset)' != 'ClangCL' And '$(Option-arch)' == 'AdvancedVectorExtensions512'">AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <TargetMachine>MachineX86</TargetMachine>
@@ -15,6 +27,12 @@
     <Lib>
       <AdditionalOptions>/MACHINE:X86 %(AdditionalOptions)</AdditionalOptions>
     </Lib>
+  </ItemDefinitionGroup>
+
+  <ItemDefinitionGroup Condition="'$(PlatformToolset)' == 'ClangCL'">
+    <ClCompile>
+      <AdditionalOptions>--target=i686-pc-windows-msvc %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
   </ItemDefinitionGroup>
 
 </Project>

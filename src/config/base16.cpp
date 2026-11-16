@@ -57,14 +57,17 @@ base16::operator const data_chunk&() const NOEXCEPT
 
 std::istream& operator>>(std::istream& stream, base16& argument) THROWS
 {
+    if (stream.peek() == std::istream::traits_type::eof())
+    {
+        argument.value_.clear();
+        return stream;
+    }
+
     std::string base16;
     stream >> base16;
 
     if (!decode_base16(argument.value_, base16))
-    {
-        using namespace boost::program_options;
         throw istream_exception(base16);
-    }
 
     return stream;
 }

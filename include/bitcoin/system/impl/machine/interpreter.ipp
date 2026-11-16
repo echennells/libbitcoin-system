@@ -41,17 +41,11 @@ op_unevaluated(opcode code) const NOEXCEPT
         error::op_reserved;
 }
 
-// TODO: nops_rule *must* be enabled in test cases and default config.
-// TODO: cats_rule should be enabled in test cases and default config.
 // Codes op_nop1..op_nop10 promoted from reserved by [0.3.6] hard fork.
 TEMPLATE
 error::op_error_t CLASS::
 op_nop(opcode) const NOEXCEPT
 {
-    if (this->is_enabled(flags::nops_rule))
-        return error::op_success;
-
-    ////return op_unevaluated(code);
     return error::op_success;
 }
 
@@ -119,10 +113,7 @@ TEMPLATE
 error::op_error_t CLASS::
 op_ver() const NOEXCEPT
 {
-    if (this->is_enabled(flags::nops_rule))
-        return op_unevaluated(opcode::op_ver);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_ver);
 }
 
 TEMPLATE
@@ -167,20 +158,14 @@ TEMPLATE
 error::op_error_t CLASS::
 op_verif() const NOEXCEPT
 {
-    if (this->is_enabled(flags::nops_rule))
-        return op_unevaluated(opcode::op_verif);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_verif);
 }
 
 TEMPLATE
 error::op_error_t CLASS::
 op_vernotif() const NOEXCEPT
 {
-    if (this->is_enabled(flags::nops_rule))
-        return op_unevaluated(opcode::op_vernotif);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_vernotif);
 }
 
 TEMPLATE
@@ -223,10 +208,7 @@ TEMPLATE
 error::op_error_t CLASS::
 op_return() const NOEXCEPT
 {
-    if (this->is_enabled(flags::nops_rule))
-        return op_unevaluated(opcode::op_return);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_return);
 }
 
 TEMPLATE
@@ -495,40 +477,28 @@ TEMPLATE
 error::op_error_t CLASS::
 op_cat() const NOEXCEPT
 {
-    if (this->is_enabled(flags::cats_rule))
-        return op_unevaluated(opcode::op_cat);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_cat);
 }
 
 TEMPLATE
 error::op_error_t CLASS::
 op_substr() const NOEXCEPT
 {
-    if (this->is_enabled(flags::cats_rule))
-        return op_unevaluated(opcode::op_substr);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_substr);
 }
 
 TEMPLATE
 error::op_error_t CLASS::
 op_left() const NOEXCEPT
 {
-    if (this->is_enabled(flags::cats_rule))
-        return op_unevaluated(opcode::op_left);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_left);
 }
 
 TEMPLATE
 error::op_error_t CLASS::
 op_right() const NOEXCEPT
 {
-    if (this->is_enabled(flags::cats_rule))
-        return op_unevaluated(opcode::op_right);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_right);
 }
 
 TEMPLATE
@@ -546,40 +516,28 @@ TEMPLATE
 error::op_error_t CLASS::
 op_invert() const NOEXCEPT
 {
-    if (this->is_enabled(flags::cats_rule))
-        return op_unevaluated(opcode::op_invert);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_invert);
 }
 
 TEMPLATE
 error::op_error_t CLASS::
 op_and() const NOEXCEPT
 {
-    if (this->is_enabled(flags::cats_rule))
-        return op_unevaluated(opcode::op_and);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_and);
 }
 
 TEMPLATE
 error::op_error_t CLASS::
 op_or() const NOEXCEPT
 {
-    if (this->is_enabled(flags::cats_rule))
-        return op_unevaluated(opcode::op_or);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_or);
 }
 
 TEMPLATE
 error::op_error_t CLASS::
 op_xor() const NOEXCEPT
 {
-    if (this->is_enabled(flags::cats_rule))
-        return op_unevaluated(opcode::op_xor);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_xor);
 }
 
 TEMPLATE
@@ -632,20 +590,14 @@ TEMPLATE
 error::op_error_t CLASS::
 op_mul2() const NOEXCEPT
 {
-    if (this->is_enabled(flags::cats_rule))
-        return op_unevaluated(opcode::op_mul2);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_mul2);
 }
 
 TEMPLATE
 error::op_error_t CLASS::
 op_div2() const NOEXCEPT
 {
-    if (this->is_enabled(flags::cats_rule))
-        return op_unevaluated(opcode::op_div2);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_div2);
 }
 
 TEMPLATE
@@ -731,50 +683,35 @@ TEMPLATE
 error::op_error_t CLASS::
 op_mul() const NOEXCEPT
 {
-    if (this->is_enabled(flags::cats_rule))
-        return op_unevaluated(opcode::op_mul);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_mul);
 }
 
 TEMPLATE
 error::op_error_t CLASS::
 op_div() const NOEXCEPT
 {
-    if (this->is_enabled(flags::cats_rule))
-        return op_unevaluated(opcode::op_div);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_div);
 }
 
 TEMPLATE
 error::op_error_t CLASS::
 op_mod() const NOEXCEPT
 {
-    if (this->is_enabled(flags::cats_rule))
-        return op_unevaluated(opcode::op_mod);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_mod);
 }
 
 TEMPLATE
 error::op_error_t CLASS::
 op_lshift() const NOEXCEPT
 {
-    if (this->is_enabled(flags::cats_rule))
-        return op_unevaluated(opcode::op_lshift);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_lshift);
 }
 
 TEMPLATE
 error::op_error_t CLASS::
 op_rshift() const NOEXCEPT
 {
-    if (this->is_enabled(flags::cats_rule))
-        return op_unevaluated(opcode::op_rshift);
-
-    return error::op_not_implemented;
+    return op_unevaluated(opcode::op_rshift);
 }
 
 TEMPLATE
@@ -1154,6 +1091,7 @@ op_check_multisig_verify() NOEXCEPT
         return error::op_success;
 
     auto it = endorsements.cbegin();
+    auto spare_keys = keys.size() - endorsements.size();
     const auto subscript = this->subscript(endorsements);
     const auto bip66 = this->is_enabled(flags::bip66_rule);
 
@@ -1187,8 +1125,10 @@ op_check_multisig_verify() NOEXCEPT
             this->set_hash(*subscript, sighash_flags);
 
         // Verify ECDSA signature against public key and cache signature hash.
-        if (this->verify_ecdsa_signature(*key, this->cached_hash(), sig, false))
+        if (this->verify_ecdsa_unbatched(*key, this->cached_hash(), sig))
             ++it;
+        else if (is_zero(spare_keys--))
+            return error::op_check_multisig_mismatch;
     }
 
     // All endorsements must be verified against a key.

@@ -18,6 +18,7 @@
  */
 #include <bitcoin/system/chain/witness.hpp>
 
+#include <sstream>
 #include <bitcoin/system/chain/enums/magic_numbers.hpp>
 #include <bitcoin/system/data/data.hpp>
 #include <bitcoin/system/define.hpp>
@@ -115,6 +116,15 @@ witness::witness(const chunk_cptrs& stack, bool valid) NOEXCEPT
 }
 
 // protected
+witness::witness(chunk_cptrs&& stack, bool valid, size_t size) NOEXCEPT
+  : stack_(std::move(stack)),
+    valid_(valid),
+    size_(size),
+    annex_(annex::is_annex_pattern(stack_) ? stack_.back() : nullptr)
+{
+}
+
+// protected
 witness::witness(const chunk_cptrs& stack, bool valid, size_t size) NOEXCEPT
   : stack_(stack),
     valid_(valid),
@@ -146,10 +156,13 @@ static inline size_t element_size(const chunk_cptr& element) NOEXCEPT
     return ceilinged_add(variable_size(size), size);
 };
 
-static inline data_chunk read_element(reader& source) NOEXCEPT
+static inline chunk_cptr read_element(reader& source) NOEXCEPT
 {
+    static const auto empty = to_shared<const data_chunk>();
+
     // Each witness encoded as variable integer prefixed byte array (bip144).
-    return source.read_bytes(source.read_size(max_bytes));
+    const auto size = source.read_size(max_bytes);
+    return is_zero(size) ? empty : to_shared(source.read_bytes(size));
 }
 
 // static/private
@@ -164,9 +177,9 @@ witness witness::from_data(reader& source, bool prefix) NOEXCEPT
         const auto count = source.read_size(max_bytes);
         stack.reserve(count);
 
-        for (size_t element{}; element < count; ++element)
+        for (size_t element{}; element < count && source; ++element)
         {
-            stack.push_back(to_shared<data_chunk>(read_element(source)));
+            stack.push_back(read_element(source));
             size += element_size(stack.back());
         }
     }
@@ -174,39 +187,32 @@ witness witness::from_data(reader& source, bool prefix) NOEXCEPT
     {
         while (!source.is_exhausted())
         {
-            stack.push_back(to_shared<data_chunk>(read_element(source)));
+            stack.push_back(read_element(source));
             size += element_size(stack.back());
         }
     }
 
-    return { stack, source, size };
+    return { std::move(stack), source, size };
 }
 
 // static
 bool witness::skip(reader& source, bool prefix) NOEXCEPT
 {
-    bool superfluous{ true };
     if (prefix)
     {
         const auto count = source.read_size(max_bytes);
 
         for (size_t element{}; element < count; ++element)
-        {
-            const auto size = source.read_size(max_bytes);
-            source.read_bytes(size);
-            if (!is_zero(size))
-                superfluous = false;
-        }
+            source.skip_bytes(source.read_size(max_bytes));
+
+        return !is_zero(count);
     }
-    else
+
+    auto superfluous{ true };
+    while (!source.is_exhausted())
     {
-        while (!source.is_exhausted())
-        {
-            const auto size = source.read_size(max_bytes);
-            source.read_bytes(size);
-            if (!is_zero(size))
-                superfluous = false;
-        }
+        source.skip_bytes(source.read_size(max_bytes));
+        superfluous = false;
     }
 
     return !superfluous;
@@ -255,7 +261,7 @@ static inline bool is_push_token(const std::string& token) NOEXCEPT
 inline std::string remove_token_delimiters(const std::string& token) NOEXCEPT
 {
     BC_ASSERT(token.size() > one);
-    return std::string(std::next(token.begin()), std::prev(token.end()));
+    return std::string(std::next(token.cbegin()), std::prev(token.cend()));
 }
 
 // static/private
@@ -322,7 +328,7 @@ const chain::annex& witness::annex() const NOEXCEPT
 // static
 size_t witness::serialized_size(const chunk_cptrs& stack, bool prefix) NOEXCEPT
 {
-    const auto size = std::accumulate(stack.begin(), stack.end(), zero,
+    const auto size = std::accumulate(stack.cbegin(), stack.cend(), zero,
         [](size_t total, const chunk_cptr& element) NOEXCEPT
         {
             return ceilinged_add(total, element_size(element));

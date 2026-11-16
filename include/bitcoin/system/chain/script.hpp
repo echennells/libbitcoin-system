@@ -70,6 +70,7 @@ public:
     static constexpr bool is_sign_multisig_pattern(const operations& ops) NOEXCEPT;
     static constexpr bool is_sign_public_key_pattern(const operations& ops) NOEXCEPT;
     static constexpr bool is_sign_key_hash_pattern(const operations& ops) NOEXCEPT;
+    static constexpr bool is_sign_witness_key_hash_pattern(const operations& ops) NOEXCEPT;
     static constexpr bool is_sign_script_hash_pattern(const operations& ops) NOEXCEPT;
     static bool is_coinbase_pattern(const operations& ops, size_t height) NOEXCEPT;
 
@@ -164,6 +165,9 @@ public:
     /// Extraction.
     /// -----------------------------------------------------------------------
 
+    /// Consensus computation over a serialized script.
+    static size_t signature_operations(reader& source, bool accurate) NOEXCEPT;
+
     /// Common pattern detection.
     const chunk_cptr& witness_program() const NOEXCEPT;
     uint8_t version_value() const NOEXCEPT;
@@ -186,6 +190,8 @@ public:
 protected:
     script(stream::in::fast&& stream, bool prefix) NOEXCEPT;
     script(reader&& source, bool prefix) NOEXCEPT;
+    script(operations&& ops, bool valid, bool easier, bool failer,
+        bool roller, size_t size) NOEXCEPT;
     script(const operations& ops, bool valid, bool easier, bool failer,
         bool roller, size_t size) NOEXCEPT;
 

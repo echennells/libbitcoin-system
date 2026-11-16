@@ -10,12 +10,47 @@ name: Continuous Integration
 on:
   pull_request:
     types: [opened, synchronize, reopened, closed]
+    paths:
+      - 'builds/cmake/**'
+      - 'builds/gnu/**'
+      - 'builds/msvc/**'
+      - 'console/**'
+      - 'include/**'
+      - 'src/**'
+      - 'test/**'
+      - '!builds/gnu/AUTHORS'
+      - '!builds/gnu/COPYING'
+      - '!builds/gnu/ChangeLog'
+      - '!builds/gnu/INSTALL'
+      - '!builds/gnu/NEWS'
+      - '!builds/gnu/README'
   push:
+    branches:
+      - '**'
+    tags-ignore:
+      - '**'
+    paths:
+      - 'builds/cmake/**'
+      - 'builds/gnu/**'
+      - 'builds/msvc/**'
+      - 'console/**'
+      - 'include/**'
+      - 'src/**'
+      - 'test/**'
+      - '!builds/gnu/AUTHORS'
+      - '!builds/gnu/COPYING'
+      - '!builds/gnu/ChangeLog'
+      - '!builds/gnu/INSTALL'
+      - '!builds/gnu/NEWS'
+      - '!builds/gnu/README'
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.repository_owner == 'libbitcoin' && (github.event.pull_request.number || github.run_id) || github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   information:
@@ -34,7 +69,7 @@ jobs:
             echo "run_id   : ${{ github.run_id }}"
             echo "ref      : ${{ github.ref }}"
             echo "base_ref : ${{ github.base_ref }}"
-            echo "head_ref : ${{ github.head_ref }}"
+            echo "head_ref : $GITHUB_HEAD_REF"
 
 
   gnu:
@@ -52,20 +87,7 @@ jobs:
             cxx: "clang++"
             flags: ""
             coverage: ""
-            boost: "--build-boost"
-            secp256k1: "--build-secp256k1"
-            options: "--enable-isystem"
-
-          - image: ubuntu-24.04
-            config: "debug"
-            link: "dynamic"
-            cc: "clang-19"
-            cxx: "clang++-19"
-            flags: ""
-            coverage: ""
-            package: "clang-19 clang++-19"
-            boost: "--build-boost"
-            secp256k1: "--build-secp256k1"
+            libsecp256k1: ""
             options: "--enable-isystem"
 
           - image: ubuntu-24.04
@@ -75,8 +97,18 @@ jobs:
             cxx: "clang++-18"
             flags: ""
             coverage: ""
-            boost: "--build-boost"
-            secp256k1: "--build-secp256k1"
+            libsecp256k1: "--build-libsecp256k1"
+            options: "--enable-isystem --without-secp256k1"
+
+          - image: ubuntu-24.04
+            config: "debug"
+            link: "dynamic"
+            cc: "clang-19"
+            cxx: "clang++-19"
+            flags: ""
+            coverage: ""
+            package: "clang-19 clang++-19"
+            libsecp256k1: ""
             options: "--enable-isystem"
 
           - image: ubuntu-24.04
@@ -84,10 +116,42 @@ jobs:
             link: "static"
             cc: "gcc-13"
             cxx: "g++-13"
-            flags: "--coverage -fprofile-update=atomic"
+            flags: "--coverage -fprofile-update=atomic -fno-inline"
             coverage: "lcov"
-            boost: "--build-boost"
-            secp256k1: "--build-secp256k1"
+            libsecp256k1: ""
+            options: "--enable-isystem"
+
+          - image: ubuntu-24.04
+            config: "debug"
+            link: "static"
+            cc: "s390x-linux-gnu-gcc"
+            cxx: "s390x-linux-gnu-g++"
+            flags: ""
+            coverage: ""
+            package: "gcc-s390x-linux-gnu g++-s390x-linux-gnu qemu-user-static"
+            host: "s390x-linux-gnu"
+            libsecp256k1: ""
+            options: "--enable-isystem --build-skip-test-run"
+
+          - image: macos-26-intel
+            config: "release"
+            link: "static"
+            cc: "clang"
+            cxx: "clang++"
+            flags: ""
+            coverage: ""
+            libsecp256k1: ""
+            options: "--enable-isystem"
+
+          - image: ubuntu-24.04-arm
+            config: "release"
+            link: "static"
+            cc: "gcc-14"
+            cxx: "g++-14"
+            flags: ""
+            coverage: ""
+            package: "gcc-14 g++-14"
+            libsecp256k1: ""
             options: "--enable-isystem"
 
           - image: ubuntu-24.04
@@ -95,12 +159,35 @@ jobs:
             link: "static"
             cc: "gcc-15"
             cxx: "g++-15"
+            flags: "-m32"
+            coverage: ""
+            package: "gcc-15-multilib g++-15-multilib"
+            libsecp256k1: ""
+            options: "--enable-isystem"
+
+          - image: ubuntu-24.04
+            config: "debug"
+            link: "static"
+            cc: "arm-linux-gnueabihf-gcc"
+            cxx: "arm-linux-gnueabihf-g++"
             flags: ""
             coverage: ""
-            package: "g++-15 gcc-15"
-            boost: "--build-boost"
-            secp256k1: "--build-secp256k1"
-            options: "--enable-isystem"
+            package: "gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf qemu-user-static"
+            host: "arm-linux-gnueabihf"
+            libsecp256k1: ""
+            options: "--enable-isystem --build-skip-test-run"
+
+          - image: ubuntu-26.04
+            config: "release"
+            link: "static"
+            cc: "x86_64-w64-mingw32-gcc-posix"
+            cxx: "x86_64-w64-mingw32-g++-posix"
+            flags: ""
+            coverage: ""
+            package: "gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix"
+            host: "x86_64-w64-mingw32"
+            libsecp256k1: ""
+            options: "--enable-isystem --build-skip-test-run"
 
     runs-on: ${{ matrix.image }}
 
@@ -109,20 +196,22 @@ jobs:
       CXX: '${{ matrix.cxx }}'
       CFLAGS: '${{ matrix.flags }}'
       CXXFLAGS: '${{ matrix.flags }}'
+      QEMU_LD_PREFIX: "${{ matrix.host && format('/usr/{0}', matrix.host) || '' }}"
 
     steps:
       - name: Get branch name
         id: get-branch
+        shell: bash
         run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "branch=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+          if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+            echo "branch=$GITHUB_HEAD_REF" >> $GITHUB_OUTPUT
           else
-            echo "branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "branch=$GITHUB_REF_NAME" >> $GITHUB_OUTPUT
           fi
 
       - name: Checkout repository [libbitcoin-system]
         id: checkout-libbitcoin-system
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           path: 'libbitcoin-system'
@@ -137,7 +226,9 @@ jobs:
           if [[ "${{ matrix.package }}" == *"g++-15"* ]] ||
              [[ "${{ matrix.package }}" == *"gcc-15"* ]] ||
              [[ "${{ matrix.package }}" == *"g++-16"* ]] ||
-             [[ "${{ matrix.package }}" == *"gcc-16"* ]]; then
+             [[ "${{ matrix.package }}" == *"gcc-16"* ]] ||
+             [[ "${{ matrix.package }}" == *"gcc-15-multilib"* ]] ||
+             [[ "${{ matrix.package }}" == *"g++-15-multilib"* ]]; then
             sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
             sudo apt-get update
           fi
@@ -155,11 +246,27 @@ jobs:
               echo "PATH=/opt/homebrew/opt/${{ matrix.llvm }}/bin:${PATH}" >> $GITHUB_ENV
           fi
 
+      - name: Prepare toolchain [windows]
+        if: ${{ startsWith(matrix.image, 'windows') }}
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+
       - name: Environmental Computation
         shell: bash
         run: |
           if [[ "${{ matrix.link }}" == "dynamic" ]]; then
               echo "LDFLAGS=-Wl,-rpath,${{ github.workspace }}/prefix/lib" >> $GITHUB_ENV
+          fi
+
+      - name: Verify emulation [cross]
+        if: ${{ matrix.host }}
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          echo 'int main() { return 0; }' > emulation.c
+          ${{ matrix.cc }} ${{ matrix.flags }} emulation.c -o emulation
+          file emulation
+          if [[ "${{ matrix.options }}" != *"--build-skip-tests"* &&   "${{ matrix.options }}" != *"--build-skip-test-run"* ]]; then
+            ./emulation
           fi
 
       - name: Execute installation
@@ -175,9 +282,9 @@ jobs:
           --build-obj-dir-relative
           --build-config="${{ matrix.config }}"
           --build-link="${{ matrix.link }}"
-          ${{ matrix.boost }}
-          ${{ matrix.secp256k1 }}
+          ${{ matrix.libsecp256k1 }}
           ${{ matrix.options }}
+          ${{ matrix.host && format('--host={0}', matrix.host) || '' }}
 
       - name: Coverage calculation
         if: ${{ matrix.coverage == 'lcov' }}
@@ -185,14 +292,15 @@ jobs:
         working-directory: 'libbitcoin-system'
         run: |
           lcov --ignore-errors version,gcov,mismatch,mismatch --directory . --capture --output-file coverage.info
-          lcov --ignore-errors unused --remove coverage.info "${{ github.workspace }}/prefix/*" "${{ github.workspace }}/libbitcoin-system/examples/*" "${{ github.workspace }}/libbitcoin-system/test/*" "${{ github.workspace }}/libbitcoin-system/src/wallet/addresses/qrencode/*" "${{ github.workspace }}/libbitcoin-system/src/words/catalogs/*" --output-file coverage.info
+          lcov --ignore-errors unused --extract coverage.info "${{ github.workspace }}/libbitcoin-system/include/*" "${{ github.workspace }}/libbitcoin-system/src/*" --output-file coverage.info
+          lcov --ignore-errors unused --remove coverage.info "${{ github.workspace }}/libbitcoin-system/src/words/catalogs/*" "${{ github.workspace }}/libbitcoin-system/src/crypto/secp256k1/cuda/*" --output-file coverage.info
 
       - name: Coveralls.io upload
         if: ${{ matrix.coverage == 'lcov' }}
         shell: bash
         working-directory: 'libbitcoin-system'
         env:
-          COVERALLS_REPO_TOKEN: ${{ secrets.github_token }}
+          COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           curl -sLO https://github.com/coverallsapp/coverage-reporter/releases/latest/download/coveralls-linux-x86_64.tar.gz
           curl -sLO https://github.com/coverallsapp/coverage-reporter/releases/latest/download/coveralls-checksums.txt
@@ -217,7 +325,7 @@ jobs:
 
       - name: Test artifact upload
         if: failure()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: testlogs
           path: ${{ github.workspace }}/*.errors
@@ -239,42 +347,7 @@ jobs:
             cxx: "clang++"
             flags: ""
             coverage: ""
-            boost: "--build-boost"
-            secp256k1: "--build-secp256k1"
-            options: ""
-
-          - image: ubuntu-24.04
-            config: "release"
-            link: "static"
-            cc: "clang-19"
-            cxx: "clang++-19"
-            flags: ""
-            coverage: ""
-            package: "clang-19 clang++-19"
-            boost: "--build-boost"
-            secp256k1: "--build-secp256k1"
-            options: ""
-
-          - image: ubuntu-24.04
-            config: "release"
-            link: "dynamic"
-            cc: "gcc-12"
-            cxx: "g++-12"
-            flags: ""
-            coverage: ""
-            boost: "--build-boost"
-            secp256k1: "--build-secp256k1"
-            options: ""
-
-          - image: ubuntu-24.04
-            config: "debug"
-            link: "static"
-            cc: "gcc-14"
-            cxx: "g++-14"
-            flags: ""
-            coverage: ""
-            boost: "--build-boost"
-            secp256k1: "--build-secp256k1"
+            libsecp256k1: ""
             options: ""
 
           - image: ubuntu-24.04
@@ -285,8 +358,7 @@ jobs:
             flags: ""
             coverage: ""
             package: "g++-16 gcc-16"
-            boost: "--build-boost"
-            secp256k1: "--build-secp256k1"
+            libsecp256k1: ""
             options: ""
 
     runs-on: ${{ matrix.image }}
@@ -300,16 +372,17 @@ jobs:
     steps:
       - name: Get branch name
         id: get-branch
+        shell: bash
         run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "branch=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+          if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+            echo "branch=$GITHUB_HEAD_REF" >> $GITHUB_OUTPUT
           else
-            echo "branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "branch=$GITHUB_REF_NAME" >> $GITHUB_OUTPUT
           fi
 
       - name: Checkout repository [libbitcoin-system]
         id: checkout-libbitcoin-system
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           path: 'libbitcoin-system'
@@ -324,7 +397,9 @@ jobs:
           if [[ "${{ matrix.package }}" == *"g++-15"* ]] ||
              [[ "${{ matrix.package }}" == *"gcc-15"* ]] ||
              [[ "${{ matrix.package }}" == *"g++-16"* ]] ||
-             [[ "${{ matrix.package }}" == *"gcc-16"* ]]; then
+             [[ "${{ matrix.package }}" == *"gcc-16"* ]] ||
+             [[ "${{ matrix.package }}" == *"gcc-15-multilib"* ]] ||
+             [[ "${{ matrix.package }}" == *"g++-15-multilib"* ]]; then
             sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
             sudo apt-get update
           fi
@@ -341,6 +416,10 @@ jobs:
           if [[ -n "${{ matrix.llvm }}" ]]; then
               echo "PATH=/opt/homebrew/opt/${{ matrix.llvm }}/bin:${PATH}" >> $GITHUB_ENV
           fi
+
+      - name: Prepare toolchain [windows]
+        if: ${{ startsWith(matrix.image, 'windows') }}
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
 
       - name: Environmental Computation
         shell: bash
@@ -362,8 +441,7 @@ jobs:
           --build-obj-dir-relative
           --build-config="${{ matrix.config }}"
           --build-link="${{ matrix.link }}"
-          ${{ matrix.boost }}
-          ${{ matrix.secp256k1 }}
+          ${{ matrix.libsecp256k1 }}
           ${{ matrix.options }}
 
       - name: Coverage calculation
@@ -372,14 +450,15 @@ jobs:
         working-directory: 'libbitcoin-system'
         run: |
           lcov --ignore-errors version,gcov,mismatch,mismatch --directory . --capture --output-file coverage.info
-          lcov --ignore-errors unused --remove coverage.info "${{ github.workspace }}/prefix/*" "${{ github.workspace }}/libbitcoin-system/examples/*" "${{ github.workspace }}/libbitcoin-system/test/*" "${{ github.workspace }}/libbitcoin-system/src/wallet/addresses/qrencode/*" "${{ github.workspace }}/libbitcoin-system/src/words/catalogs/*" --output-file coverage.info
+          lcov --ignore-errors unused --extract coverage.info "${{ github.workspace }}/libbitcoin-system/include/*" "${{ github.workspace }}/libbitcoin-system/src/*" --output-file coverage.info
+          lcov --ignore-errors unused --remove coverage.info "${{ github.workspace }}/libbitcoin-system/src/words/catalogs/*" "${{ github.workspace }}/libbitcoin-system/src/crypto/secp256k1/cuda/*" --output-file coverage.info
 
       - name: Coveralls.io upload
         if: ${{ matrix.coverage == 'lcov' }}
         shell: bash
         working-directory: 'libbitcoin-system'
         env:
-          COVERALLS_REPO_TOKEN: ${{ secrets.github_token }}
+          COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           curl -sLO https://github.com/coverallsapp/coverage-reporter/releases/latest/download/coveralls-linux-x86_64.tar.gz
           curl -sLO https://github.com/coverallsapp/coverage-reporter/releases/latest/download/coveralls-checksums.txt
@@ -404,7 +483,7 @@ jobs:
 
       - name: Test artifact upload
         if: failure()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: testlogs
           path: ${{ github.workspace }}/*.errors
@@ -419,24 +498,31 @@ jobs:
 
       matrix:
         include:
-          - image: ubuntu-24.04
-            preset: "nix-gnu-release-shared"
-            cc: "clang-18"
-            cxx: "clang++-18"
+          - image: windows-latest
+            preset: "win-msvc-release-static"
+            cc: ""
+            cxx: ""
             flags: ""
             coverage: ""
-            boost: "--build-boost"
-            secp256k1: "--build-secp256k1"
-            options: "--build-skip-tests"
+            libsecp256k1: ""
+            options: ""
+
+          - image: windows-latest
+            preset: "win-clangcl-release-static"
+            cc: ""
+            cxx: ""
+            flags: ""
+            coverage: ""
+            libsecp256k1: ""
+            options: ""
 
           - image: ubuntu-24.04
             preset: "nix-gnu-debug-static"
-            cc: "gcc-12"
-            cxx: "g++-12"
+            cc: "gcc-13"
+            cxx: "g++-13"
             flags: ""
             coverage: ""
-            boost: "--build-boost"
-            secp256k1: "--build-secp256k1"
+            libsecp256k1: ""
             options: "--build-skip-tests"
 
     runs-on: ${{ matrix.image }}
@@ -450,16 +536,17 @@ jobs:
     steps:
       - name: Get branch name
         id: get-branch
+        shell: bash
         run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "branch=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+          if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+            echo "branch=$GITHUB_HEAD_REF" >> $GITHUB_OUTPUT
           else
-            echo "branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "branch=$GITHUB_REF_NAME" >> $GITHUB_OUTPUT
           fi
 
       - name: Checkout repository [libbitcoin-system]
         id: checkout-libbitcoin-system
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           path: 'libbitcoin-system'
@@ -474,7 +561,9 @@ jobs:
           if [[ "${{ matrix.package }}" == *"g++-15"* ]] ||
              [[ "${{ matrix.package }}" == *"gcc-15"* ]] ||
              [[ "${{ matrix.package }}" == *"g++-16"* ]] ||
-             [[ "${{ matrix.package }}" == *"gcc-16"* ]]; then
+             [[ "${{ matrix.package }}" == *"gcc-16"* ]] ||
+             [[ "${{ matrix.package }}" == *"gcc-15-multilib"* ]] ||
+             [[ "${{ matrix.package }}" == *"g++-15-multilib"* ]]; then
             sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
             sudo apt-get update
           fi
@@ -492,10 +581,14 @@ jobs:
               echo "PATH=/opt/homebrew/opt/${{ matrix.llvm }}/bin:${PATH}" >> $GITHUB_ENV
           fi
 
+      - name: Prepare toolchain [windows]
+        if: ${{ startsWith(matrix.image, 'windows') }}
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+
       - name: Environmental Computation
         shell: bash
         run: |
-          if [[ "${{ matrix.preset }}" == *shared* ]]; then
+          if [[ "${{ matrix.preset }}" == *shared* && "${{ matrix.image }}" != windows* ]]; then
               echo "LDFLAGS=-Wl,-rpath,${{ github.workspace }}/prefix/lib" >> $GITHUB_ENV
           fi
 
@@ -507,8 +600,7 @@ jobs:
           --build-use-local-src
           --build-src-dir="${{ github.workspace }}"
           --build-preset="${{ matrix.preset }}"
-          ${{ matrix.boost }}
-          ${{ matrix.secp256k1 }}
+          ${{ matrix.libsecp256k1 }}
           ${{ matrix.options }}
 
       - name: Coverage calculation
@@ -517,14 +609,15 @@ jobs:
         working-directory: 'libbitcoin-system'
         run: |
           lcov --ignore-errors version,gcov,mismatch,mismatch --directory . --capture --output-file coverage.info
-          lcov --ignore-errors unused --remove coverage.info "${{ github.workspace }}/prefix/*" "${{ github.workspace }}/libbitcoin-system/examples/*" "${{ github.workspace }}/libbitcoin-system/test/*" "${{ github.workspace }}/libbitcoin-system/src/wallet/addresses/qrencode/*" "${{ github.workspace }}/libbitcoin-system/src/words/catalogs/*" --output-file coverage.info
+          lcov --ignore-errors unused --extract coverage.info "${{ github.workspace }}/libbitcoin-system/include/*" "${{ github.workspace }}/libbitcoin-system/src/*" --output-file coverage.info
+          lcov --ignore-errors unused --remove coverage.info "${{ github.workspace }}/libbitcoin-system/src/words/catalogs/*" "${{ github.workspace }}/libbitcoin-system/src/crypto/secp256k1/cuda/*" --output-file coverage.info
 
       - name: Coveralls.io upload
         if: ${{ matrix.coverage == 'lcov' }}
         shell: bash
         working-directory: 'libbitcoin-system'
         env:
-          COVERALLS_REPO_TOKEN: ${{ secrets.github_token }}
+          COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           curl -sLO https://github.com/coverallsapp/coverage-reporter/releases/latest/download/coveralls-linux-x86_64.tar.gz
           curl -sLO https://github.com/coverallsapp/coverage-reporter/releases/latest/download/coveralls-checksums.txt
@@ -549,7 +642,7 @@ jobs:
 
       - name: Test artifact upload
         if: failure()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: testlogs
           path: ${{ github.workspace }}/*.errors
@@ -569,12 +662,35 @@ jobs:
             platform: "x64"
             version: "vs2026"
             tests: "*"
+            options: ""
 
           - image: windows-2025-vs2026
             configuration: "StaticRelease"
             platform: "x64"
             version: "vs2026"
             tests: "*"
+            options: ""
+
+          - image: windows-latest
+            configuration: "StaticRelease"
+            platform: "Win32"
+            version: "vs2026"
+            tests: "*"
+            options: ""
+
+          - image: windows-latest
+            configuration: "StaticRelease"
+            platform: "x64"
+            version: "vs2026"
+            tests: "*"
+            options: "--build-compiler clang"
+
+          - image: windows-11-vs2026-arm
+            configuration: "StaticRelease"
+            platform: "ARM64"
+            version: "vs2026"
+            tests: "*"
+            options: ""
 
     runs-on: ${{ matrix.image }}
 
@@ -583,24 +699,31 @@ jobs:
         id: get-branch
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "branch=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+          if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+            echo "branch=$GITHUB_HEAD_REF" >> $GITHUB_OUTPUT
           else
-            echo "branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "branch=$GITHUB_REF_NAME" >> $GITHUB_OUTPUT
           fi
 
       - name: Set msbuild path
-        uses: microsoft/setup-msbuild@v3
+        uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
         with:
-          msbuild-architecture: x64
+          msbuild-architecture: ${{ matrix.platform == 'ARM64' && 'arm64' || 'x64' }}
 
       - name: Checkout repository [libbitcoin-system]
         id: checkout-libbitcoin-system
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           path: 'libbitcoin-system'
+          persist-credentials: false
           repository: ${{ github.repository }}
+
+      - name: Force clean nuget package repository
+        shell: cmd
+        working-directory: 'libbitcoin-system'
+        run: |
+          nuget locals all -clear
 
       - name: Execute build
         shell: cmd
@@ -612,22 +735,23 @@ jobs:
           --build-platform ${{ matrix.platform }}
           --build-version ${{ matrix.version }}
           --build-use-local-src
+          ${{ matrix.options }}
 
       - name: Execute tests
         shell: powershell
         working-directory: 'libbitcoin-system'
         run: |
           Write-Host "Locating test executables..." -ForegroundColor Yellow;
-          $BC_TEST_EXES = @(Get-ChildItem -Path "bin" -recurse | Where-Object { $_.Name -eq "libbitcoin-system-test.exe" });
+          $BC_TEST_EXES = @(Get-ChildItem -Path "bin", "..\bin" -recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq "libbitcoin-system-test.exe" });
           If ($BC_TEST_EXES.Count -ne 1) {
             Write-Host "Failure, invalid count of test executables." -ForegroundColor Red;
             exit 1;
           }
           Write-Host "Found single test executable: " $BC_TEST_EXES.FullName -ForegroundColor Green;
           $BC_TEST_SINGLETON = $BC_TEST_EXES.FullName;
-          Write-Host "Executing $BC_TEST_SINGLETON $env:BOOST_UNIT_TEST_OPTIONS" -ForegroundColor Yellow;
+          Write-Host "Executing $BC_TEST_SINGLETON" -ForegroundColor Yellow;
           try {
-            Invoke-Expression "$BC_TEST_SINGLETON --log_level=warning --run_test=${{ matrix.tests }} $env:BOOST_UNIT_TEST_OPTIONS"
+            Invoke-Expression "$BC_TEST_SINGLETON --log_level=warning --run_test=${{ matrix.tests }}"
           }
           catch {
             $ERR = $_;

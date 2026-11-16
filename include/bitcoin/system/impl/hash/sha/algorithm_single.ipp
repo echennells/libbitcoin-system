@@ -81,8 +81,7 @@ hash(const half_t& half) NOEXCEPT
         buffer_t buffer{};
         input_left(buffer, half);
         pad_half(buffer);
-        schedule(buffer);
-        compress(state, buffer);
+        schedule_compress(state, buffer);
         return output(state);
     };
 
@@ -110,8 +109,7 @@ hash(const half_t& left, const half_t& right) NOEXCEPT
         buffer_t buffer{};
         input_left(buffer, left);
         input_right(buffer, right);
-        schedule(buffer);
-        compress(state, buffer);
+        schedule_compress(state, buffer);
         schedule_1(buffer);
         compress(state, buffer);
         return output(state);
@@ -140,9 +138,42 @@ midstate(const half_t& left, const half_t& right) NOEXCEPT
     buffer_t buffer{};
     input_left(buffer, left);
     input_right(buffer, right);
-    schedule(buffer);
-    compress(state, buffer);
+    schedule_compress(state, buffer);
     return state;
+}
+
+TEMPLATE
+constexpr typename CLASS::digest_t CLASS::
+hash(const state_t& midstate, const half_t& first, const half_t& second,
+    const half_t& third) NOEXCEPT
+{
+    auto state = midstate;
+    buffer_t buffer{};
+    input_left(buffer, first);
+    input_right(buffer, second);
+    schedule_compress(state, buffer);
+    input_left(buffer, third);
+    pad_half<two>(buffer);
+    schedule_compress(state, buffer);
+    return output(state);
+}
+
+TEMPLATE
+template <size_t Size, if_not_greater<Size, CLASSIF::space>>
+constexpr typename CLASS::digest_t CLASS::
+hash(const state_t& midstate, const bytes_t<Size>& bytes) NOEXCEPT
+{
+    block_t block{};
+    for (size_t byte{}; byte < Size; ++byte)
+        block[byte] = bytes[byte];
+
+    simple_pad<Size, array_count<block_t>>(block);
+
+    auto state = midstate;
+    buffer_t buffer{};
+    input(buffer, block);
+    schedule_compress(state, buffer);
+    return output(state);
 }
 
 TEMPLATE
@@ -156,8 +187,7 @@ hash(const quart_t& left, const quart_t& right) NOEXCEPT
         input_left(buffer, left);
         input_right(buffer, right);
         pad_half(buffer);
-        schedule(buffer);
-        compress(state, buffer);
+        schedule_compress(state, buffer);
         return output(state);
     };
 
@@ -188,7 +218,7 @@ constexpr typename CLASS::digest_t CLASS::
 simple_hash(const bytes_t<Size>& bytes) NOEXCEPT
 {
     block_t block{};
-    std::copy_n(bytes.begin(), Size, block.begin());
+    std::copy_n(bytes.cbegin(), Size, block.begin());
     simple_pad<Size>(block);
 
     const auto hasher = [](const block_t& block) NOEXCEPT
@@ -196,8 +226,7 @@ simple_hash(const bytes_t<Size>& bytes) NOEXCEPT
         auto state = H::get;
         buffer_t buffer{};
         input(buffer, block);
-        schedule(buffer);
-        compress(state, buffer);
+        schedule_compress(state, buffer);
         return output(state);
     };
 

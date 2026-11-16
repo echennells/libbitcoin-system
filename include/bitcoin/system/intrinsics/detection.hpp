@@ -19,16 +19,8 @@
 #ifndef LIBBITCOIN_SYSTEM_INTRINSICS_DETECTION_HPP
 #define LIBBITCOIN_SYSTEM_INTRINSICS_DETECTION_HPP
 
-#if defined(HAVE_ARM)
-    #if defined(HAVE_LINUX)
-        #include <sys/auxv.h>
-        #include <asm/hwcap.h>
-    #endif
-    #if defined(HAVE_APPLE)
-        #include <sys/sysctl.h>
-    #endif
-#endif
-
+#include <cstdio>
+#include <cstdlib>
 #include <bitcoin/system/define.hpp>
 #include <bitcoin/system/intrinsics/cpuid.hpp>
 
@@ -38,23 +30,70 @@ namespace system {
 /// Runtime checks for Intel SIMD availability.
 /// ---------------------------------------------------------------------------
 
+namespace cpu0_0
+{
+    constexpr auto leaf = 0;
+    constexpr auto subleaf = 0;
+    constexpr auto intel_ebx = 0x756e6547_u32;
+    constexpr auto intel_edx = 0x49656e69_u32;
+    constexpr auto intel_ecx = 0x6c65746e_u32;
+}
+
 namespace cpu1_0
 {
     constexpr auto leaf = 1;
     constexpr auto subleaf = 0;
+    constexpr auto sse3_ecx_bit = 0;
+    constexpr auto pclmulqdq_ecx_bit = 1;
+    constexpr auto ssse3_ecx_bit = 9;
+    constexpr auto fma_ecx_bit = 12;
+    constexpr auto cx16_ecx_bit = 13;
     constexpr auto sse41_ecx_bit = 19;
+    constexpr auto sse42_ecx_bit = 20;
+    constexpr auto movbe_ecx_bit = 22;
+    constexpr auto popcnt_ecx_bit = 23;
+    constexpr auto aes_ecx_bit = 25;
     constexpr auto xsave_ecx_bit = 27;
     constexpr auto avx_ecx_bit = 28;
+    constexpr auto f16c_ecx_bit = 29;
+    constexpr auto signature_mask = 0x0fff0ff0_u32;
+    constexpr auto skylake_server = 0x00050650_u32;
+    constexpr auto knights_landing = 0x00050670_u32;
+    constexpr auto knights_mill = 0x00080650_u32;
 }
 
 namespace cpu7_0
 {
     constexpr auto leaf = 7;
     constexpr auto subleaf = 0;
+    constexpr auto bmi1_ebx_bit = 3;
     constexpr auto avx2_ebx_bit = 5;
-    ////constexpr auto avx512f_ebx_bit = 16;
+    constexpr auto bmi2_ebx_bit = 8;
+    constexpr auto avx512f_ebx_bit = 16;
+    constexpr auto avx512dq_ebx_bit = 17;
+    constexpr auto avx512cd_ebx_bit = 28;
     constexpr auto avx512bw_ebx_bit = 30;
     constexpr auto shani_ebx_bit = 29;
+    constexpr auto avx512ifma_ebx_bit = 21;
+    constexpr auto avx512vl_ebx_bit = 31;
+    constexpr auto vaes_ecx_bit = 9;
+    constexpr auto vpclmulqdq_ecx_bit = 10;
+}
+
+namespace cpu7_1
+{
+    constexpr auto leaf = 7;
+    constexpr auto subleaf = 1;
+    constexpr auto sha512_eax_bit = 0;
+    constexpr auto avxifma_eax_bit = 23;
+}
+
+namespace cpu80000001_0
+{
+    constexpr auto leaf = 0x80000001;
+    constexpr auto subleaf = 0;
+    constexpr auto lahf_ecx_bit = 0;
+    constexpr auto lzcnt_ecx_bit = 5;
 }
 
 namespace xcr0
@@ -62,122 +101,345 @@ namespace xcr0
     constexpr auto feature = 0;
     constexpr auto sse_bit = 1;
     constexpr auto avx_bit = 2;
+    constexpr auto opmask_bit = 5;
+    constexpr auto zmm_upper_bit = 6;
+    constexpr auto zmm_high_bit = 7;
 }
 
-// Local util because no dependency on /math.
+// Local utils because no dependency on /math.
 template <size_t Bit, typename Value>
-constexpr bool get_bit(Value value) NOEXCEPT
+BASELINE constexpr bool get_bit(Value value) NOEXCEPT
 {
     constexpr auto mask = (Value{ 1 } << Bit);
-    return !is_zero(value & mask);
+    return (value & mask) != 0;
 }
 
-inline bool try_shani() NOEXCEPT
+// Cores that lower the clock for any 512 bit instruction.
+BASELINE constexpr bool is_throttled(uint32_t signature) NOEXCEPT
+{
+    signature &= cpu1_0::signature_mask;
+    return signature == cpu1_0::skylake_server
+        || signature == cpu1_0::knights_landing
+        || signature == cpu1_0::knights_mill;
+}
+
+template <auto Cpu = get_cpu>
+BASELINE inline bool is_avx512_low() NOEXCEPT
 {
     uint32_t eax{}, ebx{}, ecx{}, edx{};
-    return get_cpu(eax, ebx, ecx, edx, cpu1_0::leaf, cpu1_0::subleaf)
-        && get_bit<cpu1_0::sse41_ecx_bit>(ecx)      // SSE4.1
-        && (eax >= cpu7_0::leaf)
-        && get_cpu(eax, ebx, ecx, edx, cpu7_0::leaf, cpu7_0::subleaf)
-        && get_bit<cpu7_0::shani_ebx_bit>(ebx);     // SHA
+    return Cpu(eax, ebx, ecx, edx, cpu0_0::leaf, cpu0_0::subleaf)
+        && ebx == cpu0_0::intel_ebx                     // Genu
+        && edx == cpu0_0::intel_edx                     // ineI
+        && ecx == cpu0_0::intel_ecx                     // ntel
+        && Cpu(eax, ebx, ecx, edx, cpu1_0::leaf, cpu1_0::subleaf)
+        && is_throttled(eax);                           // Skylake-SP, Xeon Phi
 }
 
-inline bool try_avx512() NOEXCEPT
+template <auto Cpu = get_cpu>
+BASELINE inline bool try_shani() NOEXCEPT
+{
+    uint32_t eax{}, ebx{}, ecx{}, edx{};
+    return Cpu(eax, ebx, ecx, edx, cpu1_0::leaf, cpu1_0::subleaf)
+        && get_bit<cpu1_0::sse41_ecx_bit>(ecx)          // SSE4.1
+        && Cpu(eax, ebx, ecx, edx, cpu7_0::leaf, cpu7_0::subleaf)
+        && get_bit<cpu7_0::shani_ebx_bit>(ebx);         // SHA
+}
+
+template <auto Cpu = get_cpu, auto Xcr = get_xcr>
+BASELINE inline bool try_sha512() NOEXCEPT
 {
     uint64_t extended{};
     uint32_t eax{}, ebx{}, ecx{}, edx{};
-    return get_cpu(eax, ebx, ecx, edx, cpu1_0::leaf, cpu1_0::subleaf)
-        && get_bit<cpu1_0::sse41_ecx_bit>(ecx)      // SSE4.1
-        && get_bit<cpu1_0::xsave_ecx_bit>(ecx)      // XSAVE
-        && get_bit<cpu1_0::avx_ecx_bit>(ecx)        // AVX
-        && get_xcr(extended, xcr0::feature)
+    return Cpu(eax, ebx, ecx, edx, cpu1_0::leaf, cpu1_0::subleaf)
+        && get_bit<cpu1_0::sse41_ecx_bit>(ecx)          // SSE4.1
+        && get_bit<cpu1_0::xsave_ecx_bit>(ecx)          // XSAVE
+        && get_bit<cpu1_0::avx_ecx_bit>(ecx)            // AVX
+        && Xcr(extended, xcr0::feature)
         && get_bit<xcr0::sse_bit>(extended)
         && get_bit<xcr0::avx_bit>(extended)
-        && get_cpu(eax, ebx, ecx, edx, cpu7_0::leaf, cpu7_0::subleaf)
-        && get_bit<cpu7_0::avx2_ebx_bit>(ebx)       // AVX2 (implied?)
-        && get_bit<cpu7_0::avx512bw_ebx_bit>(ebx);  // AVX512BW
+        && Cpu(eax, ebx, ecx, edx, cpu7_0::leaf, cpu7_0::subleaf)
+        && get_bit<cpu7_0::avx2_ebx_bit>(ebx)           // AVX2
+        && eax >= cpu7_1::subleaf                       // Subleaf 1
+        && Cpu(eax, ebx, ecx, edx, cpu7_1::leaf, cpu7_1::subleaf)
+        && get_bit<cpu7_1::sha512_eax_bit>(eax);        // SHA512
 }
 
-inline bool try_avx2() NOEXCEPT
+template <auto Cpu = get_cpu, auto Xcr = get_xcr>
+BASELINE inline bool is_avx512() NOEXCEPT
 {
     uint64_t extended{};
     uint32_t eax{}, ebx{}, ecx{}, edx{};
-    return get_cpu(eax, ebx, ecx, edx, cpu1_0::leaf, cpu1_0::subleaf)
-        && get_bit<cpu1_0::sse41_ecx_bit>(ecx)      // SSE4.1
-        && get_bit<cpu1_0::xsave_ecx_bit>(ecx)      // XSAVE
-        && get_bit<cpu1_0::avx_ecx_bit>(ecx)        // AVX
-        && get_xcr(extended, xcr0::feature)
+    return Cpu(eax, ebx, ecx, edx, cpu1_0::leaf, cpu1_0::subleaf)
+        && get_bit<cpu1_0::sse41_ecx_bit>(ecx)          // SSE4.1
+        && get_bit<cpu1_0::xsave_ecx_bit>(ecx)          // XSAVE
+        && get_bit<cpu1_0::avx_ecx_bit>(ecx)            // AVX
+        && Xcr(extended, xcr0::feature)
         && get_bit<xcr0::sse_bit>(extended)
         && get_bit<xcr0::avx_bit>(extended)
-        && get_cpu(eax, ebx, ecx, edx, cpu7_0::leaf, cpu7_0::subleaf)
-        && get_bit<cpu7_0::avx2_ebx_bit>(ebx);      // AVX2
+        && get_bit<xcr0::opmask_bit>(extended)
+        && get_bit<xcr0::zmm_upper_bit>(extended)
+        && get_bit<xcr0::zmm_high_bit>(extended)
+        && Cpu(eax, ebx, ecx, edx, cpu7_0::leaf, cpu7_0::subleaf)
+        && get_bit<cpu7_0::avx2_ebx_bit>(ebx)           // AVX2
+        && get_bit<cpu7_0::avx512f_ebx_bit>(ebx)        // AVX512F
+        && get_bit<cpu7_0::avx512bw_ebx_bit>(ebx)       // AVX512BW
+        && get_bit<cpu7_0::avx512vl_ebx_bit>(ebx);      // AVX512VL
 }
 
-inline bool try_sse41() NOEXCEPT
+template <auto Cpu = get_cpu, auto Xcr = get_xcr>
+BASELINE inline bool try_avx512() NOEXCEPT
+{
+    return is_avx512<Cpu, Xcr>()
+        && !is_avx512_low<Cpu>();                       // Not throttled
+}
+
+template <auto Cpu = get_cpu, auto Xcr = get_xcr>
+BASELINE inline bool try_avx512ifma() NOEXCEPT
+{
+    uint64_t extended{};
+    uint32_t eax{}, ebx{}, ecx{}, edx{};
+    return Cpu(eax, ebx, ecx, edx, cpu1_0::leaf, cpu1_0::subleaf)
+        && get_bit<cpu1_0::sse41_ecx_bit>(ecx)          // SSE4.1
+        && get_bit<cpu1_0::xsave_ecx_bit>(ecx)          // XSAVE
+        && get_bit<cpu1_0::avx_ecx_bit>(ecx)            // AVX
+        && Xcr(extended, xcr0::feature)
+        && get_bit<xcr0::sse_bit>(extended)
+        && get_bit<xcr0::avx_bit>(extended)
+        && get_bit<xcr0::opmask_bit>(extended)
+        && get_bit<xcr0::zmm_upper_bit>(extended)
+        && get_bit<xcr0::zmm_high_bit>(extended)
+        && Cpu(eax, ebx, ecx, edx, cpu7_0::leaf, cpu7_0::subleaf)
+        && get_bit<cpu7_0::avx2_ebx_bit>(ebx)           // AVX2
+        && get_bit<cpu7_0::avx512f_ebx_bit>(ebx)        // AVX512F
+        && get_bit<cpu7_0::avx512vl_ebx_bit>(ebx)       // AVX512VL
+        && get_bit<cpu7_0::avx512ifma_ebx_bit>(ebx);    // AVX512IFMA
+}
+
+template <auto Cpu = get_cpu, auto Xcr = get_xcr>
+BASELINE inline bool try_avxifma() NOEXCEPT
+{
+    uint64_t extended{};
+    uint32_t eax{}, ebx{}, ecx{}, edx{};
+    return Cpu(eax, ebx, ecx, edx, cpu1_0::leaf, cpu1_0::subleaf)
+        && get_bit<cpu1_0::sse41_ecx_bit>(ecx)          // SSE4.1
+        && get_bit<cpu1_0::xsave_ecx_bit>(ecx)          // XSAVE
+        && get_bit<cpu1_0::avx_ecx_bit>(ecx)            // AVX
+        && Xcr(extended, xcr0::feature)
+        && get_bit<xcr0::sse_bit>(extended)
+        && get_bit<xcr0::avx_bit>(extended)
+        && Cpu(eax, ebx, ecx, edx, cpu7_0::leaf, cpu7_0::subleaf)
+        && get_bit<cpu7_0::avx2_ebx_bit>(ebx)           // AVX2
+        && eax >= cpu7_1::subleaf                       // Subleaf 1
+        && Cpu(eax, ebx, ecx, edx, cpu7_1::leaf, cpu7_1::subleaf)
+        && get_bit<cpu7_1::avxifma_eax_bit>(eax);       // AVXIFMA
+}
+
+template <auto Cpu = get_cpu, auto Xcr = get_xcr>
+BASELINE inline bool try_avx2() NOEXCEPT
+{
+    uint64_t extended{};
+    uint32_t eax{}, ebx{}, ecx{}, edx{};
+    return Cpu(eax, ebx, ecx, edx, cpu1_0::leaf, cpu1_0::subleaf)
+        && get_bit<cpu1_0::sse41_ecx_bit>(ecx)          // SSE4.1
+        && get_bit<cpu1_0::xsave_ecx_bit>(ecx)          // XSAVE
+        && get_bit<cpu1_0::avx_ecx_bit>(ecx)            // AVX
+        && Xcr(extended, xcr0::feature)
+        && get_bit<xcr0::sse_bit>(extended)
+        && get_bit<xcr0::avx_bit>(extended)
+        && Cpu(eax, ebx, ecx, edx, cpu7_0::leaf, cpu7_0::subleaf)
+        && get_bit<cpu7_0::avx2_ebx_bit>(ebx);          // AVX2
+}
+
+template <auto Cpu = get_cpu>
+BASELINE inline bool try_sse41() NOEXCEPT
 {
     uint32_t eax{}, ebx{}, ecx{}, edx{};
-    return get_cpu(eax, ebx, ecx, edx, cpu1_0::leaf, cpu1_0::subleaf)
-        && get_bit<cpu1_0::sse41_ecx_bit>(ecx);     // SSE4.1
+    return Cpu(eax, ebx, ecx, edx, cpu1_0::leaf, cpu1_0::subleaf)
+        && get_bit<cpu1_0::sse41_ecx_bit>(ecx);         // SSE4.1
 }
 
-/// Runtime checks for ARM NEON and CRYPTO availability.
+template <auto Cpu = get_cpu>
+BASELINE inline bool try_aesni() NOEXCEPT
+{
+    uint32_t eax{}, ebx{}, ecx{}, edx{};
+    return Cpu(eax, ebx, ecx, edx, cpu1_0::leaf, cpu1_0::subleaf)
+        && get_bit<cpu1_0::sse41_ecx_bit>(ecx)          // SSE4.1
+        && get_bit<cpu1_0::pclmulqdq_ecx_bit>(ecx)      // PCLMULQDQ
+        && get_bit<cpu1_0::aes_ecx_bit>(ecx);           // AES
+}
+
+template <auto Cpu = get_cpu, auto Xcr = get_xcr>
+BASELINE inline bool try_vaes() NOEXCEPT
+{
+    uint64_t extended{};
+    uint32_t eax{}, ebx{}, ecx{}, edx{};
+    return Cpu(eax, ebx, ecx, edx, cpu1_0::leaf, cpu1_0::subleaf)
+        && get_bit<cpu1_0::sse41_ecx_bit>(ecx)          // SSE4.1
+        && get_bit<cpu1_0::pclmulqdq_ecx_bit>(ecx)      // PCLMULQDQ
+        && get_bit<cpu1_0::aes_ecx_bit>(ecx)            // AES
+        && get_bit<cpu1_0::xsave_ecx_bit>(ecx)          // XSAVE
+        && get_bit<cpu1_0::avx_ecx_bit>(ecx)            // AVX
+        && Xcr(extended, xcr0::feature)
+        && get_bit<xcr0::sse_bit>(extended)
+        && get_bit<xcr0::avx_bit>(extended)
+        && Cpu(eax, ebx, ecx, edx, cpu7_0::leaf, cpu7_0::subleaf)
+        && get_bit<cpu7_0::avx2_ebx_bit>(ebx)           // AVX2
+        && get_bit<cpu7_0::vaes_ecx_bit>(ecx)           // VAES
+        && get_bit<cpu7_0::vpclmulqdq_ecx_bit>(ecx);    // VPCLMULQDQ
+}
+
+template <auto Cpu = get_cpu>
+BASELINE inline bool try_x86_64_v2() NOEXCEPT
+{
+    uint32_t eax{}, ebx{}, ecx{}, edx{};
+    return Cpu(eax, ebx, ecx, edx, cpu1_0::leaf, cpu1_0::subleaf)
+        && get_bit<cpu1_0::sse3_ecx_bit>(ecx)           // SSE3
+        && get_bit<cpu1_0::ssse3_ecx_bit>(ecx)          // SSSE3
+        && get_bit<cpu1_0::cx16_ecx_bit>(ecx)           // CMPXCHG16B
+        && get_bit<cpu1_0::sse41_ecx_bit>(ecx)          // SSE4.1
+        && get_bit<cpu1_0::sse42_ecx_bit>(ecx)          // SSE4.2
+        && get_bit<cpu1_0::popcnt_ecx_bit>(ecx)         // POPCNT
+        && Cpu(eax, ebx, ecx, edx, cpu80000001_0::leaf, cpu80000001_0::subleaf)
+        && get_bit<cpu80000001_0::lahf_ecx_bit>(ecx);   // LAHF/SAHF
+}
+
+template <auto Cpu = get_cpu, auto Xcr = get_xcr>
+BASELINE inline bool try_x86_64_v3() NOEXCEPT
+{
+    uint32_t eax{}, ebx{}, ecx{}, edx{};
+    return try_x86_64_v2<Cpu>()
+        && try_avx2<Cpu, Xcr>()                         // AVX, AVX2, XSAVE
+        && Cpu(eax, ebx, ecx, edx, cpu1_0::leaf, cpu1_0::subleaf)
+        && get_bit<cpu1_0::fma_ecx_bit>(ecx)            // FMA
+        && get_bit<cpu1_0::movbe_ecx_bit>(ecx)          // MOVBE
+        && get_bit<cpu1_0::f16c_ecx_bit>(ecx)           // F16C
+        && Cpu(eax, ebx, ecx, edx, cpu7_0::leaf, cpu7_0::subleaf)
+        && get_bit<cpu7_0::bmi1_ebx_bit>(ebx)           // BMI1
+        && get_bit<cpu7_0::bmi2_ebx_bit>(ebx)           // BMI2
+        && Cpu(eax, ebx, ecx, edx, cpu80000001_0::leaf, cpu80000001_0::subleaf)
+        && get_bit<cpu80000001_0::lzcnt_ecx_bit>(ecx);  // LZCNT
+}
+
+template <auto Cpu = get_cpu, auto Xcr = get_xcr>
+BASELINE inline bool try_x86_64_v4() NOEXCEPT
+{
+    uint32_t eax{}, ebx{}, ecx{}, edx{};
+    return try_x86_64_v3<Cpu, Xcr>()
+        && is_avx512<Cpu, Xcr>()                        // AVX512F/BW/VL, ZMM
+        && Cpu(eax, ebx, ecx, edx, cpu7_0::leaf, cpu7_0::subleaf)
+        && get_bit<cpu7_0::avx512cd_ebx_bit>(ebx)       // AVX512CD
+        && get_bit<cpu7_0::avx512dq_ebx_bit>(ebx);      // AVX512DQ
+}
+
+/// Runtime checks for ARM NEON, SHA, AES, SHA3 and LSE availability.
 /// ---------------------------------------------------------------------------
 
-inline bool try_neon() NOEXCEPT
+template <auto Arm = get_arm>
+BASELINE inline bool try_neon() NOEXCEPT
 {
-#if defined(HAVE_ARM)
-    #if defined(HAVE_LINUX)
-        #if defined(HAVE_ARM64)
-            constexpr auto hwcap = HWCAP_ASIMD;
-        #else
-            constexpr auto hwcap = HWCAP_NEON;
-        #endif
-        const auto caps = getauxval(AT_HWCAP);
-        return to_bool(bit_and<uint64_t>(caps, hwcap));
-    #elif defined(HAVE_APPLE)
-        int value{};
-        auto size = sizeof(int);
-        sysctlbyname("hw.optional.neon", &value, &size, nullptr, zero);
-        return to_bool(value);
-    #elif defined(HAVE_MSVC)
-        constexpr auto neon_flag = PF_ARM_NEON_INSTRUCTIONS_AVAILABLE;
-        return to_bool(::IsProcessorFeaturePresent(neon_flag));
-    #else
-        return false;
-    #endif
-#else
-    return false;
-#endif
+    return Arm(arm_feature::neon);
 }
 
-inline bool try_crypto() NOEXCEPT
+template <auto Arm = get_arm>
+BASELINE inline bool try_neon_sha2() NOEXCEPT
 {
-#if defined(HAVE_ARM)
-    #if defined(HAVE_LINUX)
-        const auto caps = getauxval(AT_HWCAP);
-        return
-            to_bool(bit_and<uint64_t>(caps, HWCAP_AES)) &&
-            to_bool(bit_and<uint64_t>(caps, HWCAP_SHA1)) &&
-            to_bool(bit_and<uint64_t>(caps, HWCAP_SHA2));
-    #elif defined(HAVE_APPLE)
-        int aes{}, sha1{}, sha256{};
-        auto size = sizeof(int);
-        sysctlbyname("hw.optional.armv8_aes", &aes, &size, nullptr, zero);
-        sysctlbyname("hw.optional.armv8_sha1", &sha1, &size, nullptr, zero);
-        sysctlbyname("hw.optional.armv8_sha256",&sha256, &size, nullptr, zero);
-        return to_bool(aes) && to_bool(sha1) && to_bool(sha256);
-    #elif defined(HAVE_MSVC)
-        constexpr auto crypto_flag = PF_ARM_V8_CRYPTO_INSTRUCTIONS_AVAILABLE;
-        return to_bool(::IsProcessorFeaturePresent(crypto_flag));
-    #else
-        return false;
-    #endif
+    return Arm(arm_feature::sha1)
+        && Arm(arm_feature::sha256);
+}
+
+template <auto Arm = get_arm>
+BASELINE inline bool try_neon_aes() NOEXCEPT
+{
+    return Arm(arm_feature::aes)
+        && Arm(arm_feature::pmull);
+}
+
+template <auto Arm = get_arm>
+BASELINE inline bool try_neon_sha3() NOEXCEPT
+{
+    return Arm(arm_feature::sha3)
+        && Arm(arm_feature::sha512);
+}
+
+template <auto Arm = get_arm>
+BASELINE inline bool try_lse() NOEXCEPT
+{
+    return Arm(arm_feature::atomics);
+}
+
+/// Runtime check for every instruction set extension compiled in.
+/// ---------------------------------------------------------------------------
+
+template <auto Cpu = get_cpu, auto Xcr = get_xcr, auto Arm = get_arm>
+BASELINE inline bool try_compiled() NOEXCEPT
+{
+    // Operating systems that report arm64 features.
+#if defined(HAVE_ARM64) && \
+    (defined(HAVE_LINUX) || defined(HAVE_APPLE) || defined(HAVE_WINDOWS))
+    constexpr auto arm = true;
 #else
-    return false;
+    constexpr auto arm = false;
 #endif
+
+    return (!have_x86_64_v2 || try_x86_64_v2<Cpu>())
+        && (!have_x86_64_v3 || try_x86_64_v3<Cpu, Xcr>())
+        && (!have_x86_64_v4 || try_x86_64_v4<Cpu, Xcr>())
+        && (!have_sse41 || try_sse41<Cpu>())
+        && (!have_avx2 || try_avx2<Cpu, Xcr>())
+        && (!have_avx512 || is_avx512<Cpu, Xcr>())
+        && (!have_avx512ifma || try_avx512ifma<Cpu, Xcr>())
+        && (!have_avxifma || try_avxifma<Cpu, Xcr>())
+        && (!have_shani || try_shani<Cpu>())
+        && (!(have_xcpu && have_sha512) || try_sha512<Cpu, Xcr>())
+        && (!have_aesni || try_aesni<Cpu>())
+        && (!have_vaes || try_vaes<Cpu, Xcr>())
+        && (!(arm && have_neon) || try_neon<Arm>())
+        && (!(arm && have_neon_aes) || try_neon_aes<Arm>())
+        && (!(arm && have_neon_sha) || try_neon_sha2<Arm>())
+        && (!(arm && have_neon_sha3) || try_neon_sha3<Arm>())
+        && (!(arm && have_lse) || try_lse<Arm>());
+}
+
+/// Exit with the message if the processor lacks a compiled extension.
+BASELINE inline void hardware_check(const char* message) NOEXCEPT
+{
+    if (try_compiled())
+        return;
+
+    std::fputs(message, stderr);
+    std::fputs("\n", stderr);
+    std::_Exit(EXIT_FAILURE);
 }
 
 } // namespace system
 } // namespace libbitcoin
+
+/// Exit with the message before static initialization if the processor lacks a
+/// compiled extension. Use once, at file scope, in the first object linked into
+/// the executable (macOS runs initializers in link order).
+#if defined(_MSC_VER)
+    #if defined(HAVE_X32)
+        #define BC_HARDWARE_CHECK_SYMBOL "_bc_hardware_check_entry"
+    #else
+        #define BC_HARDWARE_CHECK_SYMBOL "bc_hardware_check_entry"
+    #endif
+    #define BC_USE_HARDWARE_CHECK(message) \
+        BASELINE static int bc_hardware_check() NOEXCEPT \
+        { \
+            libbitcoin::system::hardware_check(message); \
+            return 0; \
+        } \
+        __pragma(section(".CRT$XIU", long, read)) \
+        extern "C" __declspec(allocate(".CRT$XIU")) \
+            int(*bc_hardware_check_entry)() = &bc_hardware_check; \
+        __pragma(comment(linker, "/include:" BC_HARDWARE_CHECK_SYMBOL))
+#else
+    #define BC_USE_HARDWARE_CHECK(message) \
+        __attribute__((constructor(101))) BASELINE \
+        static void bc_hardware_check() NOEXCEPT \
+        { \
+            libbitcoin::system::hardware_check(message); \
+        }
+#endif
 
 #endif

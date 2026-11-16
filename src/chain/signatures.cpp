@@ -79,7 +79,6 @@ schnorr_signatures& signatures::schnorr_rows() NOEXCEPT
 void signatures::purge() NOEXCEPT
 {
     auto& self = registry();
-    const std::unique_lock lock{ self.mutex };
     for (const auto rows: self.ecdsa)
         rows->purge();
 
@@ -107,8 +106,8 @@ bool signatures::schnorr(const hash_digest& digest, const ec_xonly& point,
 }
 
 bool signatures::multisig(const hash_digest& digest,
-    std::span<const ec_compressed> keys,
-    std::span<const ec_signature> sigs) const NOEXCEPT
+    const std::span<const ec_compressed>& keys,
+    const std::span<const ec_signature>& sigs) const NOEXCEPT
 {
     BC_ASSERT(enabled);
     return ecdsa_rows().append(digest, keys, sigs);

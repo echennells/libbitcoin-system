@@ -105,8 +105,11 @@ std::string descriptor::to_checksum(const std::string& body) NOEXCEPT
 
     std::string out{};
     for (size_t index{}; index < checksum_length; ++index)
-        out += checksum_charset.at(bit_and<uint64_t>(
-            shift_right(check, 5 * (7 - index)), 31));
+    {
+        const auto shifted = shift_right(check, 5 * (7 - index));
+        const auto symbol = bit_and<uint64_t>(shifted, 31);
+        out += checksum_charset.at(possible_narrow_cast<size_t>(symbol));
+    }
 
     return out;
 }
@@ -329,7 +332,7 @@ bool descriptor::key_expression::derive(psbt::derivation& out,
             bitcoin_short_hash(compressed));
     }
 
-    to.path.insert(to.path.end(), path.begin(), path.end());
+    to.path.insert(to.path.cend(), path.cbegin(), path.cend());
     if (wildcard)
         to.path.push_back(hardened ? bit_or(index, hardened_bit) : index);
 
@@ -366,7 +369,7 @@ bool descriptor::parse(node& out, const std::string& body,
     };
 
     const auto entry = functions.find(name);
-    if (entry == functions.end())
+    if (entry == functions.cend())
         return false;
 
     out.type = entry->second;
@@ -392,8 +395,8 @@ bool descriptor::parse(node& out, const std::string& body,
                 return false;
 
             out.required = possible_narrow_cast<uint8_t>(required);
-            for (auto part = std::next(parts.begin());
-                part != parts.end(); ++part)
+            for (auto part = std::next(parts.cbegin());
+                part != parts.cend(); ++part)
             {
                 key_expression key{};
                 if (!parse_key(key, *part, context))

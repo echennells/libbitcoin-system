@@ -20,6 +20,7 @@
 #define LIBBITCOIN_SYSTEM_INTRINSICS_INTEL_512_HPP
 
 #include <bitcoin/system/define.hpp>
+#include <bitcoin/system/intrinsics/count.hpp>
 #include <bitcoin/system/intrinsics/types.hpp>
 #include <bitcoin/system/intrinsics/intel/intel.hpp>
 
@@ -125,6 +126,20 @@ INLINE xint512_t add(xint512_t a, xint512_t b) NOEXCEPT
         return _mm512_add_epi64(a, b);
 }
 
+// AVX512BW
+template <auto S>
+INLINE xint512_t sub(xint512_t a, xint512_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint8_t>)
+        return _mm512_sub_epi8(a, b);
+    if constexpr (S == bits<uint16_t>)
+        return _mm512_sub_epi16(a, b);
+    if constexpr (S == bits<uint32_t>)
+        return _mm512_sub_epi32(a, b);
+    if constexpr (S == bits<uint64_t>)
+        return _mm512_sub_epi64(a, b);
+}
+
 // AVX512F
 template <auto K, auto S>
 INLINE xint512_t addc(xint512_t a) NOEXCEPT
@@ -161,6 +176,36 @@ INLINE xint512_t mul(xint512_t a, xint512_t b) NOEXCEPT
         return _mm512_mul_epu32(a, b);
 }
 
+// AVX512BW (8/16 bit), AVX512F (32/64 bit)
+template <auto S>
+INLINE xint512_t min(xint512_t a, xint512_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint8_t>)
+        return _mm512_min_epu8(a, b);
+    if constexpr (S == bits<uint16_t>)
+        return _mm512_min_epu16(a, b);
+    if constexpr (S == bits<uint32_t>)
+        return _mm512_min_epu32(a, b);
+    if constexpr (S == bits<uint64_t>)
+        return _mm512_min_epu64(a, b);
+}
+
+// AVX512IFMA (AVX512F)
+template <auto S>
+INLINE xint512_t madd52lo(xint512_t c, xint512_t a, xint512_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint64_t>)
+        return mm512_madd52lo_epu64(c, a, b);
+}
+
+// AVX512IFMA (AVX512F)
+template <auto S>
+INLINE xint512_t madd52hi(xint512_t c, xint512_t a, xint512_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint64_t>)
+        return mm512_madd52hi_epu64(c, a, b);
+}
+
 /// broadcast/get/set
 /// ---------------------------------------------------------------------------
 
@@ -178,6 +223,13 @@ INLINE xint512_t broadcast(Word a) NOEXCEPT
         return _mm512_set1_epi32(a);
     if constexpr (is_same_type<Word, uint64_t>)
         return _mm512_set1_epi64(a);
+}
+
+// AVX512F
+template <typename xWord, if_same<xWord, xint512_t> = true>
+INLINE xint512_t broadcast(xint128_t a) NOEXCEPT
+{
+    return _mm512_broadcast_i32x4(a);
 }
 
 // AVX512BW
@@ -313,29 +365,143 @@ INLINE xint512_t byteswap(xint512_t a) NOEXCEPT
         55, 54, 53, 52, 51, 50, 49, 48, 63, 62, 61, 60, 59, 58, 57, 56));
 }
 
-/// load/store (from casted to loaded/stored)
+/// load/store (lanes of Integral from casted, bytes from pointer)
 /// ---------------------------------------------------------------------------
 
+template <typename Integral = uint32_t, if_integral_integer<Integral> = true>
 INLINE xint512_t load(const xint512_t& bytes) NOEXCEPT
 {
     return _mm512_loadu_si512(&bytes);
 }
 
+template <typename Integral = uint32_t, if_integral_integer<Integral> = true>
 INLINE void store(xint512_t& bytes, xint512_t a) NOEXCEPT
 {
     _mm512_storeu_si512(&bytes, a);
 }
 
+template <typename xWord, if_same<xWord, xint512_t> = true>
+INLINE xint512_t load(const uint8_t* bytes) NOEXCEPT
+{
+    return _mm512_loadu_si512(bytes);
+}
+
+INLINE void store(uint8_t* bytes, xint512_t a) NOEXCEPT
+{
+    _mm512_storeu_si512(bytes, a);
+}
+
+template <typename Integral = uint32_t, if_integral_integer<Integral> = true>
 INLINE xint512_t load_aligned(const xint512_t& bytes) NOEXCEPT
 {
     return _mm512_load_si512(&bytes);
 }
 
+template <typename Integral = uint32_t, if_integral_integer<Integral> = true>
 INLINE void store_aligned(xint512_t& bytes, xint512_t a) NOEXCEPT
 {
     _mm512_store_si512(&bytes, a);
 }
 
+/// compare/select
+/// ---------------------------------------------------------------------------
+/// Masks are all bits set (true) or unset (false) per word.
+
+// AVX512F
+INLINE xint512_t andnot(xint512_t a, xint512_t b) NOEXCEPT
+{
+    return _mm512_andnot_si512(a, b);
+}
+
+// AVX512BW
+template <auto S>
+INLINE xint512_t eq(xint512_t a, xint512_t b) NOEXCEPT
+{
+    // Compare yields an opmask, expanded to a word mask (all ones) by set1.
+    if constexpr (S == bits<uint8_t>)
+        return _mm512_maskz_set1_epi8(_mm512_cmpeq_epi8_mask(a, b), -1);
+    if constexpr (S == bits<uint16_t>)
+        return _mm512_maskz_set1_epi16(_mm512_cmpeq_epi16_mask(a, b), -1);
+    if constexpr (S == bits<uint32_t>)
+        return _mm512_maskz_set1_epi32(_mm512_cmpeq_epi32_mask(a, b), -1);
+    if constexpr (S == bits<uint64_t>)
+        return _mm512_maskz_set1_epi64(_mm512_cmpeq_epi64_mask(a, b), -1);
+}
+
+// AVX512F
+INLINE xint512_t select(xint512_t mask, xint512_t a, xint512_t b) NOEXCEPT
+{
+    // Bitwise (mask & a) | (~mask & b).
+    return _mm512_ternarylogic_epi64(mask, a, b, 0xca);
+}
+
+// AVX512F
+INLINE bool any(xint512_t a) NOEXCEPT
+{
+    return !is_zero(_mm512_test_epi64_mask(a, a));
+}
+
+// AVX512BW
+// The index of the first unequal byte, or the word size if equal.
+INLINE size_t first_unequal(xint512_t a, xint512_t b) NOEXCEPT
+{
+    const uint64_t unequal = _mm512_cmpneq_epi8_mask(a, b);
+    return is_zero(unequal) ? sizeof(xint512_t) :
+        sign_cast<size_t>(count_right_zeros(unequal));
+}
+
+/// gather
+/// ---------------------------------------------------------------------------
+
+// AVX512F
+// vc++ (19.51) can encode a gather index in zmm16-31 with EVEX.P1[2] clear,
+// which is illegal without APX, so its gathers load each lane.
+INLINE xint512_t gather(const uint64_t* table, xint512_t index) NOEXCEPT
+{
+#if defined(HAVE_MSC)
+    BC_PUSH_WARNING(NO_POINTER_ARITHMETIC)
+    return set<xint512_t>(
+        table[possible_narrow_cast<size_t>(get<uint64_t, 0>(index))],
+        table[possible_narrow_cast<size_t>(get<uint64_t, 1>(index))],
+        table[possible_narrow_cast<size_t>(get<uint64_t, 2>(index))],
+        table[possible_narrow_cast<size_t>(get<uint64_t, 3>(index))],
+        table[possible_narrow_cast<size_t>(get<uint64_t, 4>(index))],
+        table[possible_narrow_cast<size_t>(get<uint64_t, 5>(index))],
+        table[possible_narrow_cast<size_t>(get<uint64_t, 6>(index))],
+        table[possible_narrow_cast<size_t>(get<uint64_t, 7>(index))]);
+    BC_POP_WARNING()
+#else
+    return _mm512_i64gather_epi64(index, table, sizeof(uint64_t));
+#endif
+}
+
+// AVX512F
+INLINE xint512_t gather(const uint32_t* table, xint512_t index) NOEXCEPT
+{
+#if defined(HAVE_MSC)
+    BC_PUSH_WARNING(NO_POINTER_ARITHMETIC)
+    return set<xint512_t>(
+        table[possible_narrow_cast<size_t>(get<uint32_t, 0>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 1>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 2>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 3>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 4>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 5>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 6>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 7>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 8>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 9>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 10>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 11>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 12>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 13>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 14>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 15>(index))]);
+    BC_POP_WARNING()
+#else
+    return _mm512_i32gather_epi32(index, table, sizeof(uint32_t));
+#endif
+}
 
 /// interleave (for matrix transposition)
 /// ---------------------------------------------------------------------------

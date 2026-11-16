@@ -113,16 +113,32 @@ template <typename To, typename From,
     if_same_signed_integer<To, From> = true>
 constexpr To possible_wide_cast(From value) NOEXCEPT;
 
+/// Possible narrowing of size_t to uint32_t.
+template <typename Size, if_same<Size, size_t> = true>
+constexpr uint32_t to32(Size value) NOEXCEPT;
+
+/// Possible narrowing of signed_size_t to int32_t.
+template <typename Size, if_same<Size, signed_size_t> = true>
+constexpr int32_t to32(Size value) NOEXCEPT;
+
+/// Possible promotion of size_t to uint64_t.
+template <typename Size, if_same<Size, size_t> = true>
+constexpr uint64_t to64(Size value) NOEXCEPT;
+
+/// Possible promotion of signed_size_t to int64_t.
+template <typename Size, if_same<Size, signed_size_t> = true>
+constexpr int64_t to64(Size value) NOEXCEPT;
+
 /// Explicit pointer casts.
 /// ---------------------------------------------------------------------------
 
 /// Cast of pointer.
 template <typename To, typename From>
-inline To* pointer_cast(From* value) NOEXCEPT;
+HOST_DEVICE inline To* pointer_cast(From* value) NOEXCEPT;
 
 /// Possible cast of pointer.
 template <typename To, typename From>
-inline To* possible_pointer_cast(From* value) NOEXCEPT;
+HOST_DEVICE inline To* possible_pointer_cast(From* value) NOEXCEPT;
 
 /// Sign casts.
 /// ---------------------------------------------------------------------------

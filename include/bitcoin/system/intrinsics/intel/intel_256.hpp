@@ -20,6 +20,7 @@
 #define LIBBITCOIN_SYSTEM_INTRINSICS_INTEL_256_HPP
 
 #include <bitcoin/system/define.hpp>
+#include <bitcoin/system/intrinsics/count.hpp>
 #include <bitcoin/system/intrinsics/types.hpp>
 #include <bitcoin/system/intrinsics/intel/intel.hpp>
 
@@ -138,6 +139,20 @@ INLINE xint256_t add(xint256_t a, xint256_t b) NOEXCEPT
         return _mm256_add_epi64(a, b);
 }
 
+// AVX2
+template <auto S>
+INLINE xint256_t sub(xint256_t a, xint256_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint8_t>)
+        return _mm256_sub_epi8(a, b);
+    if constexpr (S == bits<uint16_t>)
+        return _mm256_sub_epi16(a, b);
+    if constexpr (S == bits<uint32_t>)
+        return _mm256_sub_epi32(a, b);
+    if constexpr (S == bits<uint64_t>)
+        return _mm256_sub_epi64(a, b);
+}
+
 // AVX
 template <auto K, auto S>
 INLINE xint256_t addc(xint256_t a) NOEXCEPT
@@ -174,6 +189,34 @@ INLINE xint256_t mul(xint256_t a, xint256_t b) NOEXCEPT
         return _mm256_mul_epu32(a, b);
 }
 
+// AVX2
+template <auto S>
+INLINE xint256_t min(xint256_t a, xint256_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint8_t>)
+        return _mm256_min_epu8(a, b);
+    if constexpr (S == bits<uint16_t>)
+        return _mm256_min_epu16(a, b);
+    if constexpr (S == bits<uint32_t>)
+        return _mm256_min_epu32(a, b);
+}
+
+// AVX512IFMA+AVX512VL or AVXIFMA (AVX2)
+template <auto S>
+INLINE xint256_t madd52lo(xint256_t c, xint256_t a, xint256_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint64_t>)
+        return mm256_madd52lo_epu64(c, a, b);
+}
+
+// AVX512IFMA+AVX512VL or AVXIFMA (AVX2)
+template <auto S>
+INLINE xint256_t madd52hi(xint256_t c, xint256_t a, xint256_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint64_t>)
+        return mm256_madd52hi_epu64(c, a, b);
+}
+
 /// broadcast/get/set
 /// ---------------------------------------------------------------------------
 
@@ -191,6 +234,13 @@ INLINE xint256_t broadcast(Word a) NOEXCEPT
         return _mm256_set1_epi32(a);
     if constexpr (is_same_type<Word, uint64_t>)
         return _mm256_set1_epi64x(a);
+}
+
+// AVX2
+template <typename xWord, if_same<xWord, xint256_t> = true>
+INLINE xint256_t broadcast(xint128_t a) NOEXCEPT
+{
+    return _mm256_broadcastsi128_si256(a);
 }
 
 // AVX2
@@ -297,29 +347,132 @@ INLINE xint256_t byteswap(xint256_t a) NOEXCEPT
         23, 22, 21, 20, 19, 18, 17, 16, 31, 30, 29, 28, 27, 26, 25, 24));
 }
 
-/// load/store (from casted to loaded/stored)
+/// load/store (lanes of Integral from casted, bytes from pointer)
 /// ---------------------------------------------------------------------------
 
+template <typename Integral = uint32_t, if_integral_integer<Integral> = true>
 INLINE xint256_t load(const xint256_t& bytes) NOEXCEPT
 {
     return _mm256_loadu_si256(&bytes);
 }
 
+template <typename Integral = uint32_t, if_integral_integer<Integral> = true>
 INLINE void store(xint256_t& bytes, xint256_t a) NOEXCEPT
 {
     _mm256_storeu_si256(&bytes, a);
 }
 
+template <typename xWord, if_same<xWord, xint256_t> = true>
+INLINE xint256_t load(const uint8_t* bytes) NOEXCEPT
+{
+    return _mm256_loadu_si256(pointer_cast<const xint256_t>(bytes));
+}
+
+INLINE void store(uint8_t* bytes, xint256_t a) NOEXCEPT
+{
+    _mm256_storeu_si256(pointer_cast<xint256_t>(bytes), a);
+}
+
+template <typename Integral = uint32_t, if_integral_integer<Integral> = true>
 INLINE xint256_t load_aligned(const xint256_t& bytes) NOEXCEPT
 {
     return _mm256_load_si256(&bytes);
 }
 
+template <typename Integral = uint32_t, if_integral_integer<Integral> = true>
 INLINE void store_aligned(xint256_t& bytes, xint256_t a) NOEXCEPT
 {
     _mm256_store_si256(&bytes, a);
 }
 
+/// compare/select
+/// ---------------------------------------------------------------------------
+/// Masks are all bits set (true) or unset (false) per word.
+
+// AVX2
+INLINE xint256_t andnot(xint256_t a, xint256_t b) NOEXCEPT
+{
+    return _mm256_andnot_si256(a, b);
+}
+
+// AVX2
+template <auto S>
+INLINE xint256_t eq(xint256_t a, xint256_t b) NOEXCEPT
+{
+    if constexpr (S == bits<uint8_t>)
+        return _mm256_cmpeq_epi8(a, b);
+    if constexpr (S == bits<uint16_t>)
+        return _mm256_cmpeq_epi16(a, b);
+    if constexpr (S == bits<uint32_t>)
+        return _mm256_cmpeq_epi32(a, b);
+    if constexpr (S == bits<uint64_t>)
+        return _mm256_cmpeq_epi64(a, b);
+}
+
+// AVX2
+INLINE xint256_t select(xint256_t mask, xint256_t a, xint256_t b) NOEXCEPT
+{
+    return _mm256_blendv_epi8(b, a, mask);
+}
+
+// AVX
+INLINE bool any(xint256_t a) NOEXCEPT
+{
+    return is_zero(_mm256_testz_si256(a, a));
+}
+
+// AVX2
+// The index of the first unequal byte, or the word size if equal.
+INLINE size_t first_unequal(xint256_t a, xint256_t b) NOEXCEPT
+{
+    const auto equal = _mm256_movemask_epi8(_mm256_cmpeq_epi8(a, b));
+    const auto unequal = bit_not(sign_cast<uint32_t>(equal));
+    return is_zero(unequal) ? sizeof(xint256_t) :
+        sign_cast<size_t>(count_right_zeros(unequal));
+}
+
+/// gather
+/// ---------------------------------------------------------------------------
+
+// AVX2
+// vc++ (19.51) can encode a gather index in ymm16-31 with EVEX.P1[2] clear,
+// which is illegal without APX, so its gathers load each lane.
+INLINE xint256_t gather(const uint64_t* table, xint256_t index) NOEXCEPT
+{
+#if defined(HAVE_MSC)
+    BC_PUSH_WARNING(NO_POINTER_ARITHMETIC)
+    return set<xint256_t>(
+        table[possible_narrow_cast<size_t>(get<uint64_t, 0>(index))],
+        table[possible_narrow_cast<size_t>(get<uint64_t, 1>(index))],
+        table[possible_narrow_cast<size_t>(get<uint64_t, 2>(index))],
+        table[possible_narrow_cast<size_t>(get<uint64_t, 3>(index))]);
+    BC_POP_WARNING()
+#else
+    return _mm256_i64gather_epi64(pointer_cast<const long long>(table),
+        index, sizeof(uint64_t));
+#endif
+}
+
+// AVX2
+INLINE xint256_t gather(const uint32_t* table, xint256_t index) NOEXCEPT
+{
+#if defined(HAVE_MSC)
+    BC_PUSH_WARNING(NO_POINTER_ARITHMETIC)
+    return set<xint256_t>(
+        table[possible_narrow_cast<size_t>(get<uint32_t, 0>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 1>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 2>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 3>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 4>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 5>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 6>(index))],
+        table[possible_narrow_cast<size_t>(get<uint32_t, 7>(index))]);
+    BC_POP_WARNING()
+#else
+    return _mm256_i32gather_epi32(pointer_cast<const int>(table), index,
+        sizeof(uint32_t));
+#endif
+}
 
 /// interleave (for matrix transposition)
 /// ---------------------------------------------------------------------------

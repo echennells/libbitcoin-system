@@ -23,9 +23,6 @@ m4_define([_git_dirty],
 
 m4_define([_GIT_DIRTY], m4_ifnblank(_git_dirty, [_git_dirty], [0]))
 
-m4_define([_GIT_ORIGIN_URL],
-    m4_dquote(m4_esyscmd_s([git remote get-url origin 2>/dev/null || echo https://github.com/libbitcoin/libbitcoin-system])))
-
 m4_define([_LIBBITCOIN_VERSION_MAJOR], [4])
 m4_define([_LIBBITCOIN_VERSION_MINOR], [0])
 m4_define([_LIBBITCOIN_VERSION_PATCH], [_GIT_COMMIT_HEIGHT])
@@ -44,8 +41,6 @@ AC_SUBST([GIT_COMMIT_HEIGHT], [_GIT_COMMIT_HEIGHT])
 AC_MSG_NOTICE([GIT_COMMIT_HEIGHT : ${GIT_COMMIT_HEIGHT}])
 AC_SUBST([GIT_DIRTY], [_GIT_DIRTY])
 AC_MSG_NOTICE([GIT_DIRTY : ${GIT_DIRTY}])
-AC_SUBST([GIT_ORIGIN_URL], [_GIT_ORIGIN_URL])
-AC_MSG_NOTICE([GIT_ORIGIN_URL : ${GIT_ORIGIN_URL}])
 
 AC_SUBST([LIBBITCOIN_VERSION_MAJOR], [_LIBBITCOIN_VERSION_MAJOR])
 AC_MSG_NOTICE([LIBBITCOIN_VERSION_MAJOR : ${LIBBITCOIN_VERSION_MAJOR}])
@@ -63,6 +58,16 @@ AC_CONFIG_MACRO_DIR([m4])
 # Compute the canonical host-system type variable host, including host_os.
 AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
+
+# Define the Windows platform and link the Windows system libraries for MinGW.
+# Programs link statically, and wmain programs link the unicode entry point.
+AS_CASE([${host_os}], [*mingw*],
+    [CPPFLAGS="${CPPFLAGS} -DUNICODE -D_UNICODE -DWIN32_LEAN_AND_MEAN -DNOMINMAX -D_WIN32_WINNT=0x0A00"
+     LIBS="${LIBS} -lws2_32 -lmswsock -ldbghelp"
+     mingw_program_LDFLAGS="-all-static"
+     mingw_wmain_LDFLAGS="-municode"])
+AC_SUBST([mingw_program_LDFLAGS])
+AC_SUBST([mingw_wmain_LDFLAGS])
 
 # Run macros for operation of generated Makefiles, enable non-recursive make.
 # Unless [foreign] is specified standard GNU files will be required,
@@ -87,6 +92,13 @@ AC_SUBST([LIBTOOL_DEPS])
 
 # Determine C++ compiler to use.
 AC_PROG_CXX
+
+# Link POSIX threads on BSD.
+AS_CASE([${host_os}], [*bsd*],
+    [AX_PTHREAD([], [AC_MSG_ERROR([POSIX threads are required.])])
+     LIBS="${PTHREAD_LIBS} ${LIBS}"
+     CFLAGS="${CFLAGS} ${PTHREAD_CFLAGS}"
+     CXXFLAGS="${CXXFLAGS} ${PTHREAD_CFLAGS}"])
 
 # Enable sed for substitution.
 AC_PROG_SED
@@ -144,7 +156,6 @@ AC_MSG_RESULT([$enable_ndebug])
 AM_CONDITIONAL([ENABLE_NDEBUG], [test "x${enable_ndebug}" != "xno"])
 AS_IF([test "x${enable_ndebug}" != "xno"], [AC_DEFINE([NDEBUG])])
 
-AS_IF([test "x${enable_shared}" != "xno"], [AC_DEFINE([BOOST_ALL_DYN_LINK])])
 
 AC_MSG_CHECKING([--with-tests option])
 AC_ARG_WITH([tests],
@@ -155,68 +166,181 @@ AC_ARG_WITH([tests],
 AC_MSG_RESULT([$with_tests])
 AM_CONDITIONAL([WITH_TESTS], [test "x${with_tests}" != "xno"])
 
-AC_MSG_CHECKING([--with-examples option])
-AC_ARG_WITH([examples],
-    AS_HELP_STRING([--with-examples],
-        [Compile with examples. @<:@default=yes@:>@]),
-    [with_examples=$withval],
-    [with_examples=yes])
-AC_MSG_RESULT([$with_examples])
-AM_CONDITIONAL([WITH_EXAMPLES], [test "x${with_examples}" != "xno"])
-
-AC_MSG_CHECKING([--enable-avx2 option])
-AC_ARG_ENABLE([avx2],
-    AS_HELP_STRING([--enable-avx2],
-        [Use Intel AVX2 intrinsics. @<:@default=no@:>@]),
-    [enable_avx2=$enableval],
-    [enable_avx2=no])
-AC_MSG_RESULT([$enable_avx2])
-AM_CONDITIONAL([ENABLE_AVX2], [test "x${enable_avx2}" != "xno"])
-
-AC_MSG_CHECKING([--enable-avx512 option])
-AC_ARG_ENABLE([avx512],
-    AS_HELP_STRING([--enable-avx512],
-        [Use Intel AVX512 intrinsics. @<:@default=no@:>@]),
-    [enable_avx512=$enableval],
-    [enable_avx512=no])
-AC_MSG_RESULT([$enable_avx512])
-AM_CONDITIONAL([ENABLE_AVX512], [test "x${enable_avx512}" != "xno"])
-
-AC_MSG_CHECKING([--enable-sse41 option])
-AC_ARG_ENABLE([sse41],
-    AS_HELP_STRING([--enable-sse41],
-        [Use SSE4.1 hardware instructions. @<:@default=no@:>@]),
-    [enable_sse41=$enableval],
-    [enable_sse41=no])
-AC_MSG_RESULT([$enable_sse41])
-AM_CONDITIONAL([ENABLE_SSE41], [test "x${enable_sse41}" != "xno"])
+AC_MSG_CHECKING([--with-console option])
+AC_ARG_WITH([console],
+    AS_HELP_STRING([--with-console],
+        [Compile with console application. @<:@default=yes@:>@]),
+    [with_console=$withval],
+    [with_console=yes])
+AC_MSG_RESULT([$with_console])
+AM_CONDITIONAL([WITH_CONSOLE], [test "x${with_console}" != "xno"])
 
 AC_MSG_CHECKING([--enable-shani option])
 AC_ARG_ENABLE([shani],
     AS_HELP_STRING([--enable-shani],
-        [Use Intel/ARM SHA Extensions. @<:@default=no@:>@]),
+        [Add Intel SHA Extensions (implies AES-NI) via compilation options. @<:@default=no@:>@]),
     [enable_shani=$enableval],
     [enable_shani=no])
 AC_MSG_RESULT([$enable_shani])
 AM_CONDITIONAL([ENABLE_SHANI], [test "x${enable_shani}" != "xno"])
 
-AC_MSG_CHECKING([--with-ultrafast option])
-AC_ARG_WITH([ultrafast],
-    AS_HELP_STRING([--with-ultrafast],
-        [Use shrec/UltrafastSecp256k1 library. @<:@default=no@:>@]),
-    [with_ultrafast=$withval],
-    [with_ultrafast=no])
-AC_MSG_RESULT([$with_ultrafast])
-AM_CONDITIONAL([WITH_ULTRAFAST], [test "x${with_ultrafast}" != "xno"])
+AC_MSG_CHECKING([--enable-sha512 option])
+AC_ARG_ENABLE([sha512],
+    AS_HELP_STRING([--enable-sha512],
+        [Add Intel SHA512 Extensions (implies AVX2) via compilation options. @<:@default=no@:>@]),
+    [enable_sha512=$enableval],
+    [enable_sha512=no])
+AC_MSG_RESULT([$enable_sha512])
+AM_CONDITIONAL([ENABLE_SHA512], [test "x${enable_sha512}" != "xno"])
+
+AC_MSG_CHECKING([--enable-aesni option])
+AC_ARG_ENABLE([aesni],
+    AS_HELP_STRING([--enable-aesni],
+        [Add Intel AES-NI and PCLMULQDQ intrinsics via compilation options. @<:@default=no@:>@]),
+    [enable_aesni=$enableval],
+    [enable_aesni=no])
+AC_MSG_RESULT([$enable_aesni])
+AM_CONDITIONAL([ENABLE_AESNI], [test "x${enable_aesni}" != "xno"])
+
+AC_MSG_CHECKING([--enable-vaes option])
+AC_ARG_ENABLE([vaes],
+    AS_HELP_STRING([--enable-vaes],
+        [Add Intel VAES and VPCLMULQDQ intrinsics (implies AES-NI and AVX2) via compilation options. @<:@default=no@:>@]),
+    [enable_vaes=$enableval],
+    [enable_vaes=no])
+AC_MSG_RESULT([$enable_vaes])
+AM_CONDITIONAL([ENABLE_VAES], [test "x${enable_vaes}" != "xno"])
+
+AC_MSG_CHECKING([--enable-avx512ifma option])
+AC_ARG_ENABLE([avx512ifma],
+    AS_HELP_STRING([--enable-avx512ifma],
+        [Add Intel AVX512 IFMA intrinsics (implies AVX512, SHA Extensions and AES-NI) via compilation options. @<:@default=no@:>@]),
+    [enable_avx512ifma=$enableval],
+    [enable_avx512ifma=no])
+AC_MSG_RESULT([$enable_avx512ifma])
+AM_CONDITIONAL([ENABLE_AVX512IFMA], [test "x${enable_avx512ifma}" != "xno"])
+
+AC_MSG_CHECKING([--enable-avx512 option])
+AC_ARG_ENABLE([avx512],
+    AS_HELP_STRING([--enable-avx512],
+        [Add Intel AVX512 intrinsics (implies AVX2 and AES-NI) via compilation options. @<:@default=no@:>@]),
+    [enable_avx512=$enableval],
+    [enable_avx512=no])
+AC_MSG_RESULT([$enable_avx512])
+AM_CONDITIONAL([ENABLE_AVX512], [test "x${enable_avx512}" != "xno"])
+
+AC_MSG_CHECKING([--enable-avxifma option])
+AC_ARG_ENABLE([avxifma],
+    AS_HELP_STRING([--enable-avxifma],
+        [Add Intel AVX IFMA intrinsics (implies AVX2, SHA Extensions and AES-NI) via compilation options. @<:@default=no@:>@]),
+    [enable_avxifma=$enableval],
+    [enable_avxifma=no])
+AC_MSG_RESULT([$enable_avxifma])
+AM_CONDITIONAL([ENABLE_AVXIFMA], [test "x${enable_avxifma}" != "xno"])
+
+AC_MSG_CHECKING([--enable-avx2 option])
+AC_ARG_ENABLE([avx2],
+    AS_HELP_STRING([--enable-avx2],
+        [Add Intel AVX2 intrinsics (implies AES-NI) via compilation options. @<:@default=no@:>@]),
+    [enable_avx2=$enableval],
+    [enable_avx2=no])
+AC_MSG_RESULT([$enable_avx2])
+AM_CONDITIONAL([ENABLE_AVX2], [test "x${enable_avx2}" != "xno"])
+
+AC_MSG_CHECKING([--enable-sse41 option])
+AC_ARG_ENABLE([sse41],
+    AS_HELP_STRING([--enable-sse41],
+        [Add SSE4.1 hardware instructions via compilation options. @<:@default=no@:>@]),
+    [enable_sse41=$enableval],
+    [enable_sse41=no])
+AC_MSG_RESULT([$enable_sse41])
+AM_CONDITIONAL([ENABLE_SSE41], [test "x${enable_sse41}" != "xno"])
+
+AC_MSG_CHECKING([--enable-sha2 option])
+AC_ARG_ENABLE([sha2],
+    AS_HELP_STRING([--enable-sha2],
+        [Check for ARM SHA1/SHA256 Extensions (implies AES). @<:@default=no@:>@]),
+    [enable_sha2=$enableval],
+    [enable_sha2=no])
+AC_MSG_RESULT([$enable_sha2])
+AM_CONDITIONAL([ENABLE_SHA2], [test "x${enable_sha2}" != "xno"])
+
+AC_MSG_CHECKING([--enable-sha3 option])
+AC_ARG_ENABLE([sha3],
+    AS_HELP_STRING([--enable-sha3],
+        [Check for ARM SHA3 Extensions for SHA512 (implies SHA1/SHA256 and AES). @<:@default=no@:>@]),
+    [enable_sha3=$enableval],
+    [enable_sha3=no])
+AC_MSG_RESULT([$enable_sha3])
+AM_CONDITIONAL([ENABLE_SHA3], [test "x${enable_sha3}" != "xno"])
+
+AC_MSG_CHECKING([--enable-aes option])
+AC_ARG_ENABLE([aes],
+    AS_HELP_STRING([--enable-aes],
+        [Check for ARM AES and PMULL Extensions. @<:@default=no@:>@]),
+    [enable_aes=$enableval],
+    [enable_aes=no])
+AC_MSG_RESULT([$enable_aes])
+AM_CONDITIONAL([ENABLE_AES], [test "x${enable_aes}" != "xno"])
 
 AC_MSG_CHECKING([--with-secp256k1 option])
 AC_ARG_WITH([secp256k1],
     AS_HELP_STRING([--with-secp256k1],
-        [Use bitcoin-core/secp256k1 library. @<:@default=yes@:>@]),
+        [Use native secp256k1 interface, otherwise external library. @<:@default=yes@:>@]),
     [with_secp256k1=$withval],
     [with_secp256k1=yes])
 AC_MSG_RESULT([$with_secp256k1])
 AM_CONDITIONAL([WITH_SECP256K1], [test "x${with_secp256k1}" != "xno"])
+
+AC_MSG_CHECKING([--with-valgrind option])
+AC_ARG_WITH([valgrind],
+    AS_HELP_STRING([--with-valgrind],
+        [Use valgrind memcheck client requests. @<:@default=no@:>@]),
+    [with_valgrind=$withval],
+    [with_valgrind=no])
+AC_MSG_RESULT([$with_valgrind])
+AM_CONDITIONAL([WITH_VALGRIND], [test "x${with_valgrind}" != "xno"])
+
+AC_MSG_CHECKING([--with-cuda option])
+AC_ARG_WITH([cuda],
+    AS_HELP_STRING([--with-cuda],
+        [Use cuda (gpu) batch signature verification (inert on macOS). @<:@default=yes@:>@]),
+    [with_cuda=$withval],
+    [with_cuda=yes])
+AC_MSG_RESULT([$with_cuda])
+AM_CONDITIONAL([WITH_CUDA], [test "x${with_cuda}" != "xno"])
+
+AC_MSG_CHECKING([--with-performance-tests option])
+AC_ARG_WITH([performance-tests],
+    AS_HELP_STRING([--with-performance-tests],
+        [Compile performance tests. @<:@default=no@:>@]),
+    [with_performance_tests=$withval],
+    [with_performance_tests=no])
+AC_MSG_RESULT([$with_performance_tests])
+AM_CONDITIONAL([WITH_PERFORMANCE_TESTS], [test "x${with_performance_tests}" != "xno"])
+
+AC_MSG_CHECKING([--with-slow-tests option])
+AC_ARG_WITH([slow-tests],
+    AS_HELP_STRING([--with-slow-tests],
+        [Compile slow tests. @<:@default=no@:>@]),
+    [with_slow_tests=$withval],
+    [with_slow_tests=no])
+AC_MSG_RESULT([$with_slow_tests])
+AM_CONDITIONAL([WITH_SLOW_TESTS], [test "x${with_slow_tests}" != "xno"])
+
+AS_IF([test "x${enable_shani}" != "xno"], [enable_aesni=yes])
+
+AS_IF([test "x${enable_avx512ifma}" != "xno"], [enable_avx512=yes enable_avx2=yes enable_shani=yes enable_aesni=yes])
+
+AS_IF([test "x${enable_avx512}" != "xno"], [enable_avx2=yes enable_aesni=yes])
+
+AS_IF([test "x${enable_avxifma}" != "xno"], [enable_avx2=yes enable_shani=yes enable_aesni=yes])
+
+AS_IF([test "x${enable_avx2}" != "xno"], [enable_aesni=yes])
+
+AS_IF([test "x${enable_sha2}" != "xno"], [enable_aes=yes])
+
+AS_IF([test "x${enable_sha3}" != "xno"], [enable_sha2=yes enable_aes=yes])
 
 # Set flags.
 #==============================================================================
@@ -242,17 +366,32 @@ AS_IF([test "x${enable_avx2}" != "xno"],
             return _mm256_extract_epi32(_mm256_slli_epi64(a, 2), 5);
           ]])
       ])
+  ],[
+    AC_COMPILE_IFELSE(
+      [
+        AC_LANG_PROGRAM(
+          [[
+            #include <stdint.h>
+            #include <immintrin.h>
+          ]],
+          [[
+            __m256i a = _mm256_set_epi32(8, 7, 6, 5, 4, 3, 2, 1);
+            return _mm256_extract_epi32(_mm256_slli_epi64(a, 2), 5);
+          ]])
+      ],
+      [AC_MSG_WARN(Environmental override enabling option 'avx2'.)],
+      [])
   ])
 
 AS_IF([test "x${enable_avx512}" != "xno"],
   [
-    AX_CHECK_COMPILE_FLAG([-mavx512f -mavx512bw],
+    AX_CHECK_COMPILE_FLAG([-mavx512f -mavx512bw -mavx512vl],
       [
-        CFLAGS="${CFLAGS} -mavx512f -mavx512bw";
-        CXXFLAGS="${CXXFLAGS} -mavx512f -mavx512bw";
-        AC_SUBST([avx512], ["-mavx512f -mavx512bw"])
+        CFLAGS="${CFLAGS} -mavx512f -mavx512bw -mavx512vl";
+        CXXFLAGS="${CXXFLAGS} -mavx512f -mavx512bw -mavx512vl";
+        AC_SUBST([avx512], ["-mavx512f -mavx512bw -mavx512vl"])
       ],[
-        AC_MSG_ERROR([-mavx512f -mavx512bw not supported.])
+        AC_MSG_ERROR([-mavx512f -mavx512bw -mavx512vl not supported.])
       ],
       [],
       [
@@ -263,9 +402,108 @@ AS_IF([test "x${enable_avx512}" != "xno"],
           ]],
           [[
             __m512i a = _mm512_set_epi32(16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
-            return _mm_extract_epi32(_mm512_extracti32x4_epi32(_mm512_slli_epi64(a, 2), 2), 1);
+            __m256i b = _mm256_set1_epi32(3);
+            return _mm_extract_epi32(_mm512_extracti32x4_epi32(_mm512_slli_epi64(a, 2), 2), 1) + _mm256_extract_epi32(_mm256_ror_epi32(b, 1), 2);
           ]])
       ])
+  ],[
+    AC_COMPILE_IFELSE(
+      [
+        AC_LANG_PROGRAM(
+          [[
+            #include <stdint.h>
+            #include <immintrin.h>
+          ]],
+          [[
+            __m512i a = _mm512_set_epi32(16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1);
+            __m256i b = _mm256_set1_epi32(3);
+            return _mm_extract_epi32(_mm512_extracti32x4_epi32(_mm512_slli_epi64(a, 2), 2), 1) + _mm256_extract_epi32(_mm256_ror_epi32(b, 1), 2);
+          ]])
+      ],
+      [AC_MSG_WARN(Environmental override enabling option 'avx512'.)],
+      [])
+  ])
+
+AS_IF([test "x${enable_avx512ifma}" != "xno"],
+  [
+    AX_CHECK_COMPILE_FLAG([-mavx512ifma -mavx512vl],
+      [
+        CFLAGS="${CFLAGS} -mavx512ifma -mavx512vl";
+        CXXFLAGS="${CXXFLAGS} -mavx512ifma -mavx512vl";
+        AC_SUBST([avx512ifma], ["-mavx512ifma -mavx512vl"])
+      ],[
+        AC_MSG_ERROR([-mavx512ifma -mavx512vl not supported.])
+      ],
+      [],
+      [
+        AC_LANG_PROGRAM(
+          [[
+            #include <stdint.h>
+            #include <immintrin.h>
+          ]],
+          [[
+            __m512i a = _mm512_set1_epi64(3);
+            __m256i b = _mm256_set1_epi64x(5);
+            return _mm_extract_epi32(_mm512_extracti32x4_epi32(_mm512_madd52lo_epu64(a, a, a), 1), 0) + _mm256_extract_epi32(_mm256_madd52hi_epu64(b, b, b), 2);
+          ]])
+      ])
+  ],[
+    AC_COMPILE_IFELSE(
+      [
+        AC_LANG_PROGRAM(
+          [[
+            #include <stdint.h>
+            #include <immintrin.h>
+          ]],
+          [[
+            __m512i a = _mm512_set1_epi64(3);
+            __m256i b = _mm256_set1_epi64x(5);
+            return _mm_extract_epi32(_mm512_extracti32x4_epi32(_mm512_madd52lo_epu64(a, a, a), 1), 0) + _mm256_extract_epi32(_mm256_madd52hi_epu64(b, b, b), 2);
+          ]])
+      ],
+      [AC_MSG_WARN(Environmental override enabling option 'avx512ifma'.)],
+      [])
+  ])
+
+AS_IF([test "x${enable_avxifma}" != "xno"],
+  [
+    AX_CHECK_COMPILE_FLAG([-mavxifma],
+      [
+        CFLAGS="${CFLAGS} -mavxifma";
+        CXXFLAGS="${CXXFLAGS} -mavxifma";
+        AC_SUBST([avxifma], ["-mavxifma"])
+      ],[
+        AC_MSG_ERROR([-mavxifma not supported.])
+      ],
+      [],
+      [
+        AC_LANG_PROGRAM(
+          [[
+            #include <stdint.h>
+            #include <immintrin.h>
+          ]],
+          [[
+            __m256i a = _mm256_set1_epi64x(3);
+            __m128i b = _mm_set1_epi64x(5);
+            return _mm256_extract_epi32(_mm256_madd52lo_avx_epu64(a, a, a), 2) + _mm_extract_epi32(_mm_madd52hi_avx_epu64(b, b, b), 2);
+          ]])
+      ])
+  ],[
+    AC_COMPILE_IFELSE(
+      [
+        AC_LANG_PROGRAM(
+          [[
+            #include <stdint.h>
+            #include <immintrin.h>
+          ]],
+          [[
+            __m256i a = _mm256_set1_epi64x(3);
+            __m128i b = _mm_set1_epi64x(5);
+            return _mm256_extract_epi32(_mm256_madd52lo_avx_epu64(a, a, a), 2) + _mm_extract_epi32(_mm_madd52hi_avx_epu64(b, b, b), 2);
+          ]])
+      ],
+      [AC_MSG_WARN(Environmental override enabling option 'avxifma'.)],
+      [])
   ])
 
 AS_IF([test "x${enable_shani}" != "xno"],
@@ -292,6 +530,64 @@ AS_IF([test "x${enable_shani}" != "xno"],
             return _mm_extract_epi32(_mm_sha256msg2_epu32(_mm_sha256msg1_epu32(_mm_sha256rnds2_epu32(a, b, k), b), a), 2);
           ]])
       ])
+  ],[
+    AC_COMPILE_IFELSE(
+      [
+        AC_LANG_PROGRAM(
+          [[
+            #include <stdint.h>
+            #include <immintrin.h>
+          ]],
+          [[
+            __m128i a = _mm_set1_epi32(0);
+            __m128i b = _mm_set1_epi32(15);
+            __m128i k = _mm_set1_epi32(31);
+            return _mm_extract_epi32(_mm_sha256msg2_epu32(_mm_sha256msg1_epu32(_mm_sha256rnds2_epu32(a, b, k), b), a), 2);
+          ]])
+      ],
+      [AC_MSG_WARN(Environmental override enabling option 'shani'.)],
+      [])
+  ])
+
+AS_IF([test "x${enable_sha512}" != "xno"],
+  [
+    AX_CHECK_COMPILE_FLAG([-mavx2 -msha512],
+      [
+        CFLAGS="${CFLAGS} -mavx2 -msha512";
+        CXXFLAGS="${CXXFLAGS} -mavx2 -msha512";
+        AC_SUBST([sha512], ["-mavx2 -msha512"])
+      ],[
+        AC_MSG_ERROR([-mavx2 -msha512 not supported.])
+      ],
+      [],
+      [
+        AC_LANG_PROGRAM(
+          [[
+            #include <stdint.h>
+            #include <immintrin.h>
+          ]],
+          [[
+            __m256i a = _mm256_set1_epi64x(0);
+            __m128i k = _mm_set1_epi64x(15);
+            return _mm256_extract_epi32(_mm256_sha512msg2_epi64(_mm256_sha512msg1_epi64(_mm256_sha512rnds2_epi64(a, a, k), k), a), 2);
+          ]])
+      ])
+  ],[
+    AC_COMPILE_IFELSE(
+      [
+        AC_LANG_PROGRAM(
+          [[
+            #include <stdint.h>
+            #include <immintrin.h>
+          ]],
+          [[
+            __m256i a = _mm256_set1_epi64x(0);
+            __m128i k = _mm_set1_epi64x(15);
+            return _mm256_extract_epi32(_mm256_sha512msg2_epi64(_mm256_sha512msg1_epi64(_mm256_sha512rnds2_epi64(a, a, k), k), a), 2);
+          ]])
+      ],
+      [AC_MSG_WARN(Environmental override enabling option 'sha512'.)],
+      [])
   ])
 
 AS_IF([test "x${enable_sse41}" != "xno"],
@@ -317,6 +613,104 @@ AS_IF([test "x${enable_sse41}" != "xno"],
             return _mm_extract_epi32(_mm_add_epi64(a, b), 2);
           ]])
       ])
+  ],[
+    AC_COMPILE_IFELSE(
+      [
+        AC_LANG_PROGRAM(
+          [[
+            #include <stdint.h>
+            #include <immintrin.h>
+          ]],
+          [[
+            __m128i a = _mm_set1_epi32(0);
+            __m128i b = _mm_set1_epi32(15);
+            return _mm_extract_epi32(_mm_add_epi64(a, b), 2);
+          ]])
+      ],
+      [AC_MSG_WARN(Environmental override enabling option 'sse41'.)],
+      [])
+  ])
+
+AS_IF([test "x${enable_aesni}" != "xno"],
+  [
+    AX_CHECK_COMPILE_FLAG([-msse4.1 -maes -mpclmul],
+      [
+        CFLAGS="${CFLAGS} -msse4.1 -maes -mpclmul";
+        CXXFLAGS="${CXXFLAGS} -msse4.1 -maes -mpclmul";
+        AC_SUBST([aesni], ["-msse4.1 -maes -mpclmul"])
+      ],[
+        AC_MSG_ERROR([-msse4.1 -maes -mpclmul not supported.])
+      ],
+      [],
+      [
+        AC_LANG_PROGRAM(
+          [[
+            #include <stdint.h>
+            #include <immintrin.h>
+          ]],
+          [[
+            __m128i a = _mm_set1_epi32(1);
+            __m128i b = _mm_set1_epi32(3);
+            return _mm_cvtsi128_si32(_mm_clmulepi64_si128(_mm_aesenc_si128(a, b), b, 0x00));
+          ]])
+      ])
+  ],[
+    AC_COMPILE_IFELSE(
+      [
+        AC_LANG_PROGRAM(
+          [[
+            #include <stdint.h>
+            #include <immintrin.h>
+          ]],
+          [[
+            __m128i a = _mm_set1_epi32(1);
+            __m128i b = _mm_set1_epi32(3);
+            return _mm_cvtsi128_si32(_mm_clmulepi64_si128(_mm_aesenc_si128(a, b), b, 0x00));
+          ]])
+      ],
+      [AC_MSG_WARN(Environmental override enabling option 'aesni'.)],
+      [])
+  ])
+
+AS_IF([test "x${enable_vaes}" != "xno"],
+  [
+    AX_CHECK_COMPILE_FLAG([-mavx2 -maes -mpclmul -mvaes -mvpclmulqdq],
+      [
+        CFLAGS="${CFLAGS} -mavx2 -maes -mpclmul -mvaes -mvpclmulqdq";
+        CXXFLAGS="${CXXFLAGS} -mavx2 -maes -mpclmul -mvaes -mvpclmulqdq";
+        AC_SUBST([vaes], ["-mavx2 -maes -mpclmul -mvaes -mvpclmulqdq"])
+      ],[
+        AC_MSG_ERROR([-mavx2 -maes -mpclmul -mvaes -mvpclmulqdq not supported.])
+      ],
+      [],
+      [
+        AC_LANG_PROGRAM(
+          [[
+            #include <stdint.h>
+            #include <immintrin.h>
+          ]],
+          [[
+            __m256i a = _mm256_set1_epi32(1);
+            __m256i b = _mm256_set1_epi32(3);
+            return _mm256_extract_epi32(_mm256_clmulepi64_epi128(_mm256_aesenc_epi128(a, b), b, 0x00), 1);
+          ]])
+      ])
+  ],[
+    AC_COMPILE_IFELSE(
+      [
+        AC_LANG_PROGRAM(
+          [[
+            #include <stdint.h>
+            #include <immintrin.h>
+          ]],
+          [[
+            __m256i a = _mm256_set1_epi32(1);
+            __m256i b = _mm256_set1_epi32(3);
+            return _mm256_extract_epi32(_mm256_clmulepi64_epi128(_mm256_aesenc_epi128(a, b), b, 0x00), 1);
+          ]])
+      ],
+      [AC_MSG_WARN(Environmental override enabling option 'vaes'.)],
+      [])
   ])
 
 AX_CHECK_COMPILE_FLAG([-Wall],
@@ -387,63 +781,86 @@ AX_CHECK_COMPILE_FLAG([-fstack-protector-all],
     CXXFLAGS="${CXXFLAGS} -fstack-protector-all";
   ])
 
+# Check architecture.
+#==============================================================================
+AC_COMPILE_IFELSE(
+  [
+    AC_LANG_PROGRAM(
+      [[
+        #include <arm_neon.h>
+      ]],
+      [[
+        uint8x16_t a = vdupq_n_u8(0);
+        return vgetq_lane_u8(vaeseq_u8(a, a), 0);
+      ]])
+  ],
+  [ TEST_COMPILES_AES="yes"; ],
+  [ TEST_COMPILES_AES="no"; ])
+
+AS_IF([test "x${enable_aes}" != "xno"],
+  [
+    AS_IF([test "x${TEST_COMPILES_AES}" != "xno"],
+      [ AC_MSG_WARN(Detected 'aes'.) ],
+      [ AC_MSG_ERROR(Expected feature not detected 'aes') ])
+  ],[
+    AS_IF([test "x${TEST_COMPILES_AES}" != "xno"],
+      [ AC_MSG_WARN(Environment enabling option 'aes'.) ],
+      [ AC_MSG_WARN(Unexpected feature not detected 'aes') ])
+])
+
+AC_COMPILE_IFELSE(
+  [
+    AC_LANG_PROGRAM(
+      [[
+        #include <arm_neon.h>
+      ]],
+      [[
+        uint32x4_t a = vdupq_n_u32(0);
+        return vgetq_lane_u32(vsha256hq_u32(a, a, a), 0);
+      ]])
+  ],
+  [ TEST_COMPILES_SHA2="yes"; ],
+  [ TEST_COMPILES_SHA2="no"; ])
+
+AS_IF([test "x${enable_sha2}" != "xno"],
+  [
+    AS_IF([test "x${TEST_COMPILES_SHA2}" != "xno"],
+      [ AC_MSG_WARN(Detected 'sha2'.) ],
+      [ AC_MSG_ERROR(Expected feature not detected 'sha2') ])
+  ],[
+    AS_IF([test "x${TEST_COMPILES_SHA2}" != "xno"],
+      [ AC_MSG_WARN(Environment enabling option 'sha2'.) ],
+      [ AC_MSG_WARN(Unexpected feature not detected 'sha2') ])
+])
+
+AC_COMPILE_IFELSE(
+  [
+    AC_LANG_PROGRAM(
+      [[
+        #include <arm_neon.h>
+      ]],
+      [[
+        uint64x2_t a = vdupq_n_u64(0);
+        return vgetq_lane_u64(vsha512hq_u64(a, a, a), 0);
+      ]])
+  ],
+  [ TEST_COMPILES_SHA3="yes"; ],
+  [ TEST_COMPILES_SHA3="no"; ])
+
+AS_IF([test "x${enable_sha3}" != "xno"],
+  [
+    AS_IF([test "x${TEST_COMPILES_SHA3}" != "xno"],
+      [ AC_MSG_WARN(Detected 'sha3'.) ],
+      [ AC_MSG_ERROR(Expected feature not detected 'sha3') ])
+  ],[
+    AS_IF([test "x${TEST_COMPILES_SHA3}" != "xno"],
+      [ AC_MSG_WARN(Environment enabling option 'sha3'.) ],
+      [ AC_MSG_WARN(Unexpected feature not detected 'sha3') ])
+])
+
 # Check dependencies.
 #==============================================================================
-AX_BOOST_BASE([1.86.0],
-  [
-    AC_SUBST([boost_CPPFLAGS], [${BOOST_CPPFLAGS}])
-    AC_SUBST([boost_ISYSTEM_CPPFLAGS], [`echo ${boost_CPPFLAGS} | ${SED} s/^-I/-isystem/g | ${SED} s/' -I'/' -isystem'/g`])
-    AC_SUBST([boost_LDFLAGS], [${BOOST_LDFLAGS}])
-    AC_MSG_NOTICE([boost_CPPFLAGS : ${boost_CPPFLAGS}])
-    AC_MSG_NOTICE([boost_ISYS_CPPFLAGS : ${boost_ISYS_CPPFLAGS}])
-    AC_MSG_NOTICE([boost_LDFLAGS : ${boost_LDFLAGS}])
-  ],
-  [
-    AC_MSG_ERROR([Boost 1.86.0 or later is required but was not found.])
-  ])
-
-AS_IF([test "x${enable_isystem}" != "xno"],
-  [ AC_SUBST([boost_BUILD_CPPFLAGS], [${boost_ISYSTEM_CPPFLAGS}]) ],
-  [ AC_SUBST([boost_BUILD_CPPFLAGS], [${boost_CPPFLAGS}]) ])
-
-AC_MSG_NOTICE([boost_BUILD_CPPFLAGS : ${boost_BUILD_CPPFLAGS}])
-
-AX_BOOST_CONTAINER
-AC_SUBST([boost_container_LIBS], [${BOOST_CONTAINER_LIB}])
-AC_MSG_NOTICE([boost_container_LIBS : ${boost_container_LIBS}])
-
-AX_BOOST_IOSTREAMS
-AC_SUBST([boost_iostreams_LIBS], [${BOOST_IOSTREAMS_LIB}])
-AC_MSG_NOTICE([boost_iostreams_LIBS : ${boost_iostreams_LIBS}])
-
-AX_BOOST_JSON
-AC_SUBST([boost_json_LIBS], [${BOOST_JSON_LIB}])
-AC_MSG_NOTICE([boost_json_LIBS : ${boost_json_LIBS}])
-
-AX_BOOST_LOCALE
-AC_SUBST([boost_locale_LIBS], [${BOOST_LOCALE_LIB}])
-AC_MSG_NOTICE([boost_locale_LIBS : ${boost_locale_LIBS}])
-
-AX_BOOST_PROGRAM_OPTIONS
-AC_SUBST([boost_program_options_LIBS], [${BOOST_PROGRAM_OPTIONS_LIB}])
-AC_MSG_NOTICE([boost_program_options_LIBS : ${boost_program_options_LIBS}])
-
-AX_BOOST_THREAD
-AC_SUBST([boost_thread_LIBS], [${BOOST_THREAD_LIB}])
-AC_MSG_NOTICE([boost_thread_LIBS : ${boost_thread_LIBS}])
-
-AX_BOOST_URL
-AC_SUBST([boost_url_LIBS], [${BOOST_URL_LIB}])
-AC_MSG_NOTICE([boost_url_LIBS : ${boost_url_LIBS}])
-
-AS_IF([(test "x${with_tests}" != "xno")],
-  [
-    AX_BOOST_UNIT_TEST_FRAMEWORK
-    AC_SUBST([boost_unit_test_framework_LIBS], [${BOOST_UNIT_TEST_FRAMEWORK_LIB}])
-    AC_MSG_NOTICE([boost_unit_test_framework_LIBS : ${boost_unit_test_framework_LIBS}])
-  ])
-
-AS_IF([test "x${with_secp256k1}" != "xno"],
+AS_IF([test "x${with_secp256k1}" = "xno"],
   [
     PKG_CHECK_MODULES(
       [secp256k1],
@@ -453,8 +870,10 @@ AS_IF([test "x${with_secp256k1}" != "xno"],
         AC_MSG_ERROR([libsecp256k1 >= 0.8.0 is required but was not found.])
       ])
     AC_SUBST([secp256k1_PKG], ['libsecp256k1 >= 0.8.0'])
+    AC_SUBST([secp256k1_VERSION], [`${PKG_CONFIG} --modversion libsecp256k1`])
     AC_SUBST([secp256k1_CPPFLAGS], [${secp256k1_CFLAGS}])
     AC_SUBST([secp256k1_ISYS_CPPFLAGS], [`echo ${secp256k1_CPPFLAGS} | ${SED} s/^-I/-isystem/g | ${SED} s/' -I'/' -isystem'/g`])
+    AC_MSG_NOTICE([secp256k1_VERSION : ${secp256k1_VERSION}])
     AC_MSG_NOTICE([secp256k1_CPPFLAGS : ${secp256k1_CPPFLAGS}])
     AC_MSG_NOTICE([secp256k1_ISYS_CPPFLAGS : ${secp256k1_ISYS_CPPFLAGS}])
     AC_MSG_NOTICE([secp256k1_OTHER_CFLAGS : ${secp256k1_OTHER_CFLAGS}])
@@ -466,32 +885,36 @@ AS_IF([test "x${with_secp256k1}" != "xno"],
     AC_MSG_NOTICE([secp256k1_BUILD_CPPFLAGS : ${secp256k1_BUILD_CPPFLAGS}])
   ])
 
-AS_IF([test "x${with_ultrafast}" != "xno"],
-  [
-    PKG_CHECK_MODULES(
-      [UltrafastSecp256k1],
-      [secp256k1-fast >= 4.0.0.0],
-      [],
-      [
-        AC_MSG_ERROR([secp256k1-fast >= 4.0.0.0 is required but was not found.])
-      ])
-    AC_SUBST([UltrafastSecp256k1_PKG], ['secp256k1-fast >= 4.0.0.0'])
-    AC_SUBST([UltrafastSecp256k1_CPPFLAGS], [${UltrafastSecp256k1_CFLAGS}])
-    AC_SUBST([UltrafastSecp256k1_ISYS_CPPFLAGS], [`echo ${UltrafastSecp256k1_CPPFLAGS} | ${SED} s/^-I/-isystem/g | ${SED} s/' -I'/' -isystem'/g`])
-    AC_MSG_NOTICE([UltrafastSecp256k1_CPPFLAGS : ${UltrafastSecp256k1_CPPFLAGS}])
-    AC_MSG_NOTICE([UltrafastSecp256k1_ISYS_CPPFLAGS : ${UltrafastSecp256k1_ISYS_CPPFLAGS}])
-    AC_MSG_NOTICE([UltrafastSecp256k1_OTHER_CFLAGS : ${UltrafastSecp256k1_OTHER_CFLAGS}])
-    AC_MSG_NOTICE([UltrafastSecp256k1_INCLUDEDIR : ${UltrafastSecp256k1_INCLUDEDIR}])
-    AC_MSG_NOTICE([UltrafastSecp256k1_LIBS : ${UltrafastSecp256k1_LIBS}])
-    AS_IF([test "x${enable_isystem}" != "xno"],
-      [AC_SUBST([UltrafastSecp256k1_BUILD_CPPFLAGS], [${UltrafastSecp256k1_ISYS_CPPFLAGS}])],
-      [AC_SUBST([UltrafastSecp256k1_BUILD_CPPFLAGS], [${UltrafastSecp256k1_CPPFLAGS}])])
-    AC_MSG_NOTICE([UltrafastSecp256k1_BUILD_CPPFLAGS : ${UltrafastSecp256k1_BUILD_CPPFLAGS}])
-  ])
+# Set preprocessor defines.
+#==============================================================================
+AS_IF([test "x${with_secp256k1}" != "xno"], [
+        AC_DEFINE([WITH_SECP256K1])
+    ])
+
+AS_IF([test "x${with_secp256k1}" = "xno"], [
+        AC_DEFINE_UNQUOTED([SECP256K1_VERSION], [${secp256k1_VERSION}])
+    ])
+
+AS_IF([test "x${with_valgrind}" != "xno"], [
+        AC_DEFINE([WITH_VALGRIND])
+    ])
+
+AS_IF([test "x${with_cuda}" != "xno"], [
+        AC_DEFINE([WITH_CUDA])
+    ])
+
+AS_IF([test "x${with_performance_tests}" != "xno"], [
+        AC_DEFINE([WITH_PERFORMANCE_TESTS])
+    ])
+
+AS_IF([test "x${with_slow_tests}" != "xno"], [
+        AC_DEFINE([WITH_SLOW_TESTS])
+    ])
 
 AC_CONFIG_FILES([
     Makefile
     libbitcoin-system.pc
+    include/bitcoin/system/version.hpp:${repository_root_dir}/include/bitcoin/system/version.hpp.in
   ])
 
 AC_OUTPUT

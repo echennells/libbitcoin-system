@@ -13,30 +13,6 @@
     <ProjectName>libbitcoin-system-test</ProjectName>
   </PropertyGroup>
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="DebugDEXE|ARM">
-      <Configuration>DebugDEXE</Configuration>
-      <Platform>ARM</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="ReleaseDEXE|ARM">
-      <Configuration>ReleaseDEXE</Configuration>
-      <Platform>ARM</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="DebugLEXE|ARM">
-      <Configuration>DebugLEXE</Configuration>
-      <Platform>ARM</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="ReleaseLEXE|ARM">
-      <Configuration>ReleaseLEXE</Configuration>
-      <Platform>ARM</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="DebugSEXE|ARM">
-      <Configuration>DebugSEXE</Configuration>
-      <Platform>ARM</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="ReleaseSEXE|ARM">
-      <Configuration>ReleaseSEXE</Configuration>
-      <Platform>ARM</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="DebugDEXE|ARM64">
       <Configuration>DebugDEXE</Configuration>
       <Platform>ARM64</Platform>
@@ -121,6 +97,8 @@
     <ClCompile Include="..\..\..\..\test\allocator.cpp" />
     <ClCompile Include="..\..\..\..\test\arena.cpp" />
     <ClCompile Include="..\..\..\..\test\chain\annex.cpp" />
+    <ClCompile Include="..\..\..\..\test\chain\batch\ecdsa_signatures.cpp" />
+    <ClCompile Include="..\..\..\..\test\chain\batch\schnorr_signatures.cpp" />
     <ClCompile Include="..\..\..\..\test\chain\batch\signatures.cpp" />
     <ClCompile Include="..\..\..\..\test\chain\batch\threshold.cpp" />
     <ClCompile Include="..\..\..\..\test\chain\block.cpp">
@@ -131,7 +109,9 @@
     <ClCompile Include="..\..\..\..\test\chain\checkpoint.cpp">
       <ObjectFileName>$(IntDir)test_chain_checkpoint.obj</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\test\chain\compact.cpp" />
+    <ClCompile Include="..\..\..\..\test\chain\compact.cpp">
+      <ObjectFileName>$(IntDir)test_chain_compact.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\test\chain\context.cpp">
       <ObjectFileName>$(IntDir)test_chain_context.obj</ObjectFileName>
     </ClCompile>
@@ -195,17 +175,33 @@
     <ClCompile Include="..\..\..\..\test\chain\script_extract.cpp" />
     <ClCompile Include="..\..\..\..\test\chain\script_patterns.cpp" />
     <ClCompile Include="..\..\..\..\test\chain\script_serialize.cpp" />
+    <ClCompile Include="..\..\..\..\test\chain\short_id.cpp" />
+    <ClCompile Include="..\..\..\..\test\chain\signet.cpp" />
     <ClCompile Include="..\..\..\..\test\chain\stripper.cpp" />
     <ClCompile Include="..\..\..\..\test\chain\taproot.cpp" />
     <ClCompile Include="..\..\..\..\test\chain\tapscript.cpp" />
     <ClCompile Include="..\..\..\..\test\chain\transaction.cpp">
       <ObjectFileName>$(IntDir)test_chain_transaction.obj</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\test\chain\views\block_view.cpp" />
-    <ClCompile Include="..\..\..\..\test\chain\views\transaction_view.cpp" />
+    <ClCompile Include="..\..\..\..\test\chain\view\block.cpp">
+      <ObjectFileName>$(IntDir)test_chain_view_block.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\chain\view\input.cpp">
+      <ObjectFileName>$(IntDir)test_chain_view_input.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\chain\view\output.cpp">
+      <ObjectFileName>$(IntDir)test_chain_view_output.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\chain\view\transaction.cpp">
+      <ObjectFileName>$(IntDir)test_chain_view_transaction.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\test\chain\witness.cpp">
       <ObjectFileName>$(IntDir)test_chain_witness.obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\test\compression\deflate.cpp" />
+    <ClCompile Include="..\..\..\..\test\compression\gzip.cpp" />
+    <ClCompile Include="..\..\..\..\test\compression\inflate.cpp" />
+    <ClCompile Include="..\..\..\..\test\compression\zlib.cpp" />
     <ClCompile Include="..\..\..\..\test\config\authority.cpp" />
     <ClCompile Include="..\..\..\..\test\config\base16.cpp" />
     <ClCompile Include="..\..\..\..\test\config\base2.cpp" />
@@ -218,34 +214,76 @@
       <ObjectFileName>$(IntDir)test_config_block.obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="..\..\..\..\test\config\byte.cpp" />
-    <ClCompile Include="..\..\..\..\test\config\endpoint.cpp" />
+    <ClCompile Include="..\..\..\..\test\config\endpoint.cpp">
+      <ObjectFileName>$(IntDir)test_config_endpoint.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\test\config\hash256.cpp" />
-    <ClCompile Include="..\..\..\..\test\config\parameter.cpp" />
-    <ClCompile Include="..\..\..\..\test\config\parser.cpp" />
     <ClCompile Include="..\..\..\..\test\config\path.cpp" />
-    <ClCompile Include="..\..\..\..\test\config\printer.cpp" />
-    <ClCompile Include="..\..\..\..\test\config\setting.cpp" />
+    <ClCompile Include="..\..\..\..\test\config\token.cpp" />
     <ClCompile Include="..\..\..\..\test\config\url.cpp" />
     <ClCompile Include="..\..\..\..\test\config\utilities.cpp" />
     <ClCompile Include="..\..\..\..\test\config\version.cpp" />
+    <ClCompile Include="..\..\..\..\test\config\witness.cpp">
+      <ObjectFileName>$(IntDir)test_config_witness.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\test\constants.cpp" />
     <ClCompile Include="..\..\..\..\test\constraints.cpp" />
+    <ClCompile Include="..\..\..\..\test\crypto\aes.cpp" />
     <ClCompile Include="..\..\..\..\test\crypto\aes256.cpp" />
+    <ClCompile Include="..\..\..\..\test\crypto\aes_gcm.cpp" />
     <ClCompile Include="..\..\..\..\test\crypto\chacha20.cpp" />
     <ClCompile Include="..\..\..\..\test\crypto\chacha20_poly1305.cpp" />
     <ClCompile Include="..\..\..\..\test\crypto\fschacha20.cpp" />
     <ClCompile Include="..\..\..\..\test\crypto\fschacha20_poly1305.cpp" />
     <ClCompile Include="..\..\..\..\test\crypto\maybe_random.cpp" />
+    <ClCompile Include="..\..\..\..\test\crypto\nist.cpp" />
+    <ClCompile Include="..\..\..\..\test\crypto\performance.cpp">
+      <ObjectFileName>$(IntDir)test_crypto_performance.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\test\crypto\poly1305.cpp" />
     <ClCompile Include="..\..\..\..\test\crypto\salsa20.cpp" />
-    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\batch.cpp">
-      <ObjectFileName>$(IntDir)test_crypto_secp256k1_batch.obj</ObjectFileName>
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\algorithm_field.cpp" />
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\algorithm_group.cpp" />
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\algorithm_multiply.cpp" />
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\algorithm_scalar.cpp" />
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\algorithm_verify.cpp" />
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\batch\compact.cpp">
+      <ObjectFileName>$(IntDir)test_crypto_secp256k1_batch_compact.obj</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\ecdsa.cpp" />
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\batch\device.cpp">
+      <ObjectFileName>$(IntDir)test_crypto_secp256k1_batch_device.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\batch\ecdsa.cpp">
+      <ObjectFileName>$(IntDir)test_crypto_secp256k1_batch_ecdsa.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\batch\performance.cpp">
+      <ObjectFileName>$(IntDir)test_crypto_secp256k1_batch_performance.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\batch\scan.cpp" />
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\batch\schnorr.cpp">
+      <ObjectFileName>$(IntDir)test_crypto_secp256k1_batch_schnorr.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\batch\silent.cpp" />
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\batch\verify.cpp">
+      <ObjectFileName>$(IntDir)test_crypto_secp256k1_batch_verify.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\bip324.cpp" />
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\bip341.cpp" />
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\ctime.cpp" />
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\ecdsa.cpp">
+      <ObjectFileName>$(IntDir)test_crypto_secp256k1_ecdsa.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\test\crypto\secp256k1\ellswift.cpp" />
     <ClCompile Include="..\..\..\..\test\crypto\secp256k1\keys.cpp" />
     <ClCompile Include="..\..\..\..\test\crypto\secp256k1\math.cpp" />
-    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\schnorr.cpp" />
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\performance.cpp">
+      <ObjectFileName>$(IntDir)test_crypto_secp256k1_performance.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\schnorr.cpp">
+      <ObjectFileName>$(IntDir)test_crypto_secp256k1_schnorr.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\crypto\secp256k1\wycheproof.cpp" />
+    <ClCompile Include="..\..\..\..\test\crypto\shamir.cpp" />
     <ClCompile Include="..\..\..\..\test\crypto\x25519.cpp" />
     <ClCompile Include="..\..\..\..\test\crypto\xsalsa20_poly1305.cpp" />
     <ClCompile Include="..\..\..\..\test\data\array_cast.cpp" />
@@ -265,9 +303,7 @@
     <ClCompile Include="..\..\..\..\test\data\no_fill_allocator.cpp" />
     <ClCompile Include="..\..\..\..\test\data\string.cpp" />
     <ClCompile Include="..\..\..\..\test\define.cpp" />
-    <ClCompile Include="..\..\..\..\test\endian\batch.cpp">
-      <ObjectFileName>$(IntDir)test_endian_batch.obj</ObjectFileName>
-    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\endian\batch.cpp" />
     <ClCompile Include="..\..\..\..\test\endian\integers.cpp" />
     <ClCompile Include="..\..\..\..\test\endian\integrals.cpp" />
     <ClCompile Include="..\..\..\..\test\endian\minimal.cpp" />
@@ -276,28 +312,40 @@
       <ObjectFileName>$(IntDir)test_endian_stream.obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="..\..\..\..\test\endian\swaps.cpp" />
-    <ClCompile Include="..\..\..\..\test\endian\uintx_t.cpp" />
+    <ClCompile Include="..\..\..\..\test\endian\uintx_t.cpp">
+      <ObjectFileName>$(IntDir)test_endian_uintx_t.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\test\endian\unsafe.cpp" />
     <ClCompile Include="..\..\..\..\test\error\block_error_t.cpp" />
     <ClCompile Include="..\..\..\..\test\error\error.cpp" />
     <ClCompile Include="..\..\..\..\test\error\error_t.cpp" />
     <ClCompile Include="..\..\..\..\test\error\errorno_t.cpp" />
+    <ClCompile Include="..\..\..\..\test\error\json_error_t.cpp" />
     <ClCompile Include="..\..\..\..\test\error\op_error_t.cpp" />
     <ClCompile Include="..\..\..\..\test\error\script_error_t.cpp" />
     <ClCompile Include="..\..\..\..\test\error\transaction_error_t.cpp" />
+    <ClCompile Include="..\..\..\..\test\error\x509_error_t.cpp" />
+    <ClCompile Include="..\..\..\..\test\execution.cpp" />
     <ClCompile Include="..\..\..\..\test\filter\bloom.cpp" />
+    <ClCompile Include="..\..\..\..\test\filter\bloom_array.cpp" />
     <ClCompile Include="..\..\..\..\test\filter\golomb.cpp" />
     <ClCompile Include="..\..\..\..\test\filter\sieve.cpp" />
     <ClCompile Include="..\..\..\..\test\funclets.cpp" />
-    <ClCompile Include="..\..\..\..\test\hacks.cpp" />
     <ClCompile Include="..\..\..\..\test\hash\accumulator.cpp" />
+    <ClCompile Include="..\..\..\..\test\hash\adler32.cpp" />
     <ClCompile Include="..\..\..\..\test\hash\checksum.cpp" />
-    <ClCompile Include="..\..\..\..\test\hash\functions.cpp" />
+    <ClCompile Include="..\..\..\..\test\hash\crc32.cpp" />
+    <ClCompile Include="..\..\..\..\test\hash\functions.cpp">
+      <ObjectFileName>$(IntDir)test_hash_functions.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\test\hash\hkdf.cpp" />
     <ClCompile Include="..\..\..\..\test\hash\hmac.cpp" />
     <ClCompile Include="..\..\..\..\test\hash\muhash.cpp" />
     <ClCompile Include="..\..\..\..\test\hash\pbkd.cpp" />
-    <ClCompile Include="..\..\..\..\test\hash\performance\performance.cpp" />
+    <ClCompile Include="..\..\..\..\test\hash\performance\performance.cpp">
+      <ObjectFileName>$(IntDir)test_hash_performance_performance.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\hash\performance\transition.cpp" />
     <ClCompile Include="..\..\..\..\test\hash\rmd\algorithm.cpp">
       <ObjectFileName>$(IntDir)test_hash_rmd_algorithm.obj</ObjectFileName>
     </ClCompile>
@@ -320,21 +368,32 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\test\hash\sha3\sha3.cpp" />
     <ClCompile Include="..\..\..\..\test\hash\siphash.cpp" />
+    <ClCompile Include="..\..\..\..\test\intrinsics\add.cpp" />
     <ClCompile Include="..\..\..\..\test\intrinsics\byte_swap.cpp" />
+    <ClCompile Include="..\..\..\..\test\intrinsics\count.cpp" />
     <ClCompile Include="..\..\..\..\test\intrinsics\cpuid.cpp" />
     <ClCompile Include="..\..\..\..\test\intrinsics\detection.cpp" />
     <ClCompile Include="..\..\..\..\test\intrinsics\intel_128.cpp" />
     <ClCompile Include="..\..\..\..\test\intrinsics\intel_256.cpp" />
     <ClCompile Include="..\..\..\..\test\intrinsics\intel_512.cpp" />
+    <ClCompile Include="..\..\..\..\test\intrinsics\multiply.cpp" />
     <ClCompile Include="..\..\..\..\test\intrinsics\platforms\intel.cpp" />
     <ClCompile Include="..\..\..\..\test\intrinsics\platforms\neon.cpp" />
-    <ClCompile Include="..\..\..\..\test\intrinsics\platforms\sve.cpp" />
     <ClCompile Include="..\..\..\..\test\intrinsics\rotate.cpp">
       <ObjectFileName>$(IntDir)test_intrinsics_rotate.obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="..\..\..\..\test\intrinsics\types.cpp">
       <ObjectFileName>$(IntDir)test_intrinsics_types.obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\test\ip\address.cpp" />
+    <ClCompile Include="..\..\..\..\test\ip\endpoint.cpp">
+      <ObjectFileName>$(IntDir)test_ip_endpoint.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\ip\functions.cpp">
+      <ObjectFileName>$(IntDir)test_ip_functions.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\ip\ipv4.cpp" />
+    <ClCompile Include="..\..\..\..\test\ip\ipv6.cpp" />
     <ClCompile Include="..\..\..\..\test\literals.cpp" />
     <ClCompile Include="..\..\..\..\test\machine\interpreter.cpp" />
     <ClCompile Include="..\..\..\..\test\machine\interpreter_connect.cpp" />
@@ -353,6 +412,7 @@
     <ClCompile Include="..\..\..\..\test\math\cast.cpp" />
     <ClCompile Include="..\..\..\..\test\math\division.cpp" />
     <ClCompile Include="..\..\..\..\test\math\expectations.cpp" />
+    <ClCompile Include="..\..\..\..\test\math\functional.cpp" />
     <ClCompile Include="..\..\..\..\test\math\limits.cpp" />
     <ClCompile Include="..\..\..\..\test\math\logarithm.cpp" />
     <ClCompile Include="..\..\..\..\test\math\multiplication.cpp" />
@@ -363,6 +423,21 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\test\math\sign.cpp" />
     <ClCompile Include="..\..\..\..\test\mocks\blocks.cpp" />
+    <ClCompile Include="..\..\..\..\test\options\description.cpp" />
+    <ClCompile Include="..\..\..\..\test\options\parameter.cpp" />
+    <ClCompile Include="..\..\..\..\test\options\parser.cpp">
+      <ObjectFileName>$(IntDir)test_options_parser.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\options\parsers.cpp" />
+    <ClCompile Include="..\..\..\..\test\options\printer.cpp" />
+    <ClCompile Include="..\..\..\..\test\options\setting.cpp" />
+    <ClCompile Include="..\..\..\..\test\options\value.cpp">
+      <ObjectFileName>$(IntDir)test_options_value.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\options\variables.cpp" />
+    <ClCompile Include="..\..\..\..\test\pool\algorithm.cpp">
+      <ObjectFileName>$(IntDir)test_pool_algorithm.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\test\radix\base_10.cpp" />
     <ClCompile Include="..\..\..\..\test\radix\base_16.cpp" />
     <ClCompile Include="..\..\..\..\test\radix\base_2048.cpp" />
@@ -373,11 +448,28 @@
     <ClCompile Include="..\..\..\..\test\radix\base_64.cpp" />
     <ClCompile Include="..\..\..\..\test\radix\base_85.cpp" />
     <ClCompile Include="..\..\..\..\test\serial\deserialize.cpp" />
+    <ClCompile Include="..\..\..\..\test\serial\json\array.cpp" />
+    <ClCompile Include="..\..\..\..\test\serial\json\conversion.cpp">
+      <ObjectFileName>$(IntDir)test_serial_json_conversion.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\serial\json\object.cpp" />
+    <ClCompile Include="..\..\..\..\test\serial\json\parser.cpp">
+      <ObjectFileName>$(IntDir)test_serial_json_parser.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\serial\json\serializer.cpp" />
+    <ClCompile Include="..\..\..\..\test\serial\json\value.cpp">
+      <ObjectFileName>$(IntDir)test_serial_json_value.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\serial\json\value_ref.cpp" />
     <ClCompile Include="..\..\..\..\test\serial\props.cpp" />
     <ClCompile Include="..\..\..\..\test\serial\serialize.cpp" />
-    <ClCompile Include="..\..\..\..\test\settings.cpp" />
+    <ClCompile Include="..\..\..\..\test\settings.cpp">
+      <ObjectFileName>$(IntDir)test_settings.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\test\stream\binary.cpp" />
-    <ClCompile Include="..\..\..\..\test\stream\device.cpp" />
+    <ClCompile Include="..\..\..\..\test\stream\device.cpp">
+      <ObjectFileName>$(IntDir)test_stream_device.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\test\stream\devices\copy_sink.cpp" />
     <ClCompile Include="..\..\..\..\test\stream\devices\copy_source.cpp" />
     <ClCompile Include="..\..\..\..\test\stream\devices\flip_sink.cpp" />
@@ -405,9 +497,15 @@
     <ClCompile Include="..\..\..\..\test\types.cpp">
       <ObjectFileName>$(IntDir)test_types.obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\test\uintx\uint256_t.cpp" />
+    <ClCompile Include="..\..\..\..\test\uintx\uintx_t.cpp">
+      <ObjectFileName>$(IntDir)test_uintx_uintx_t.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\test\unicode\ascii.cpp" />
     <ClCompile Include="..\..\..\..\test\unicode\code_points.cpp" />
-    <ClCompile Include="..\..\..\..\test\unicode\conversion.cpp" />
+    <ClCompile Include="..\..\..\..\test\unicode\conversion.cpp">
+      <ObjectFileName>$(IntDir)test_unicode_conversion.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\test\unicode\normalization.cpp" />
     <ClCompile Include="..\..\..\..\test\unicode\utf8_everywhere\environment.cpp" />
     <ClCompile Include="..\..\..\..\test\unicode\utf8_everywhere\ifstream.cpp" />
@@ -415,10 +513,20 @@
     <ClCompile Include="..\..\..\..\test\unicode\utf8_everywhere\paths.cpp" />
     <ClCompile Include="..\..\..\..\test\unicode\utf8_everywhere\unicode_istream.cpp" />
     <ClCompile Include="..\..\..\..\test\unicode\utf8_everywhere\unicode_ostream.cpp" />
+    <ClCompile Include="..\..\..\..\test\unit_test\checks.cpp" />
+    <ClCompile Include="..\..\..\..\test\unit_test\filter.cpp" />
+    <ClCompile Include="..\..\..\..\test\unit_test\registry.cpp" />
+    <ClCompile Include="..\..\..\..\test\unit_test\settings.cpp">
+      <ObjectFileName>$(IntDir)test_unit_test_settings.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\test\wallet\addresses\bitcoin_uri.cpp" />
     <ClCompile Include="..\..\..\..\test\wallet\addresses\checked.cpp" />
     <ClCompile Include="..\..\..\..\test\wallet\addresses\payment_address.cpp" />
+    <ClCompile Include="..\..\..\..\test\wallet\addresses\png.cpp" />
     <ClCompile Include="..\..\..\..\test\wallet\addresses\qr_code.cpp" />
+    <ClCompile Include="..\..\..\..\test\wallet\addresses\qr_encoder.cpp" />
+    <ClCompile Include="..\..\..\..\test\wallet\addresses\qr_matrix.cpp" />
+    <ClCompile Include="..\..\..\..\test\wallet\addresses\silent_payment.cpp" />
     <ClCompile Include="..\..\..\..\test\wallet\addresses\tiff.cpp" />
     <ClCompile Include="..\..\..\..\test\wallet\addresses\uri.cpp" />
     <ClCompile Include="..\..\..\..\test\wallet\addresses\uri_reader.cpp" />
@@ -445,6 +553,7 @@
     <ClCompile Include="..\..\..\..\test\wallet\mnemonics\mnemonic.cpp">
       <ObjectFileName>$(IntDir)test_wallet_mnemonics_mnemonic.obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\test\wallet\mnemonics\slip39.cpp" />
     <ClCompile Include="..\..\..\..\test\wallet\neutrino.cpp" />
     <ClCompile Include="..\..\..\..\test\wallet\point_value.cpp" />
     <ClCompile Include="..\..\..\..\test\wallet\points_value.cpp" />
@@ -461,24 +570,38 @@
     <ClCompile Include="..\..\..\..\test\words\dictionaries.cpp" />
     <ClCompile Include="..\..\..\..\test\words\dictionary.cpp" />
     <ClCompile Include="..\..\..\..\test\words\languages.cpp" />
+    <ClCompile Include="..\..\..\..\test\x509\builder.cpp" />
+    <ClCompile Include="..\..\..\..\test\x509\certificate.cpp" />
+    <ClCompile Include="..\..\..\..\test\x509\der.cpp" />
+    <ClCompile Include="..\..\..\..\test\x509\pem.cpp" />
+    <ClCompile Include="..\..\..\..\test\x509\private_key.cpp" />
+    <ClCompile Include="..\..\..\..\test\x509\verify.cpp">
+      <ObjectFileName>$(IntDir)test_x509_verify.obj</ObjectFileName>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\test\chain\script.hpp" />
+    <ClInclude Include="..\..\..\..\test\crypto\aes_gcm.hpp" />
+    <ClInclude Include="..\..\..\..\test\crypto\ecdh.hpp" />
+    <ClInclude Include="..\..\..\..\test\crypto\ecdsa.hpp" />
     <ClInclude Include="..\..\..\..\test\hash\hash.hpp" />
     <ClInclude Include="..\..\..\..\test\hash\performance\performance.hpp" />
     <ClInclude Include="..\..\..\..\test\hash\siphash.hpp" />
     <ClInclude Include="..\..\..\..\test\machine\accessor.hpp" />
     <ClInclude Include="..\..\..\..\test\mocks\blocks.hpp" />
     <ClInclude Include="..\..\..\..\test\test.hpp" />
+    <ClInclude Include="..\..\..\..\test\wallet\addresses\silent_payment_vectors.hpp" />
     <ClInclude Include="..\..\..\..\test\wallet\mnemonics\electrum.hpp" />
     <ClInclude Include="..\..\..\..\test\wallet\mnemonics\electrum_v1.hpp" />
     <ClInclude Include="..\..\..\..\test\wallet\mnemonics\mnemonic.hpp" />
+    <ClInclude Include="..\..\..\..\test\wallet\mnemonics\slip39.hpp" />
     <ClInclude Include="..\..\..\..\test\words\catalogs\electrum.hpp" />
     <ClInclude Include="..\..\..\..\test\words\catalogs\electrum_v1.hpp" />
     <ClInclude Include="..\..\..\..\test\words\catalogs\mnemonic.hpp" />
     <ClInclude Include="..\..\..\..\test\words\dictionaries.hpp" />
     <ClInclude Include="..\..\..\..\test\words\dictionary.hpp" />
     <ClInclude Include="..\..\..\..\test\words\languages.hpp" />
+    <ClInclude Include="..\..\..\..\test\x509\fixtures.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -488,33 +611,11 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
   <ImportGroup Label="ExtensionSettings">
-    <Import Project="$(NuGetPackageRoot)libbitcoin-boost.1.91.0\build\libbitcoin-boost.targets" Condition="Exists('$(NuGetPackageRoot)libbitcoin-boost.1.91.0\build\libbitcoin-boost.targets')" />
-    <Import Project="$(NuGetPackageRoot)libbitcoin-boost_container-vc145.1.91.0\build\libbitcoin-boost_container-vc145.targets" Condition="Exists('$(NuGetPackageRoot)libbitcoin-boost_container-vc145.1.91.0\build\libbitcoin-boost_container-vc145.targets')" />
-    <Import Project="$(NuGetPackageRoot)libbitcoin-boost_iostreams-vc145.1.91.0\build\libbitcoin-boost_iostreams-vc145.targets" Condition="Exists('$(NuGetPackageRoot)libbitcoin-boost_iostreams-vc145.1.91.0\build\libbitcoin-boost_iostreams-vc145.targets')" />
-    <Import Project="$(NuGetPackageRoot)libbitcoin-boost_json-vc145.1.91.0\build\libbitcoin-boost_json-vc145.targets" Condition="Exists('$(NuGetPackageRoot)libbitcoin-boost_json-vc145.1.91.0\build\libbitcoin-boost_json-vc145.targets')" />
-    <Import Project="$(NuGetPackageRoot)libbitcoin-boost_locale-vc145.1.91.0\build\libbitcoin-boost_locale-vc145.targets" Condition="Exists('$(NuGetPackageRoot)libbitcoin-boost_locale-vc145.1.91.0\build\libbitcoin-boost_locale-vc145.targets')" />
-    <Import Project="$(NuGetPackageRoot)libbitcoin-boost_program_options-vc145.1.91.0\build\libbitcoin-boost_program_options-vc145.targets" Condition="Exists('$(NuGetPackageRoot)libbitcoin-boost_program_options-vc145.1.91.0\build\libbitcoin-boost_program_options-vc145.targets')" />
-    <Import Project="$(NuGetPackageRoot)libbitcoin-boost_thread-vc145.1.91.0\build\libbitcoin-boost_thread-vc145.targets" Condition="Exists('$(NuGetPackageRoot)libbitcoin-boost_thread-vc145.1.91.0\build\libbitcoin-boost_thread-vc145.targets')" />
-    <Import Project="$(NuGetPackageRoot)libbitcoin-boost_unit_test_framework-vc145.1.91.0\build\libbitcoin-boost_unit_test_framework-vc145.targets" Condition="Exists('$(NuGetPackageRoot)libbitcoin-boost_unit_test_framework-vc145.1.91.0\build\libbitcoin-boost_unit_test_framework-vc145.targets')" />
-    <Import Project="$(NuGetPackageRoot)libbitcoin-boost_url-vc145.1.91.0\build\libbitcoin-boost_url-vc145.targets" Condition="Exists('$(NuGetPackageRoot)libbitcoin-boost_url-vc145.1.91.0\build\libbitcoin-boost_url-vc145.targets')" />
-    <Import Project="$(NuGetPackageRoot)secp256k1_vc145.0.8.0\build\native\secp256k1_vc145.targets" Condition="Exists('$(NuGetPackageRoot)secp256k1_vc145.0.8.0\build\native\secp256k1_vc145.targets')" />
-    <Import Project="$(NuGetPackageRoot)UltrafastSecp256k1-vc145.4.5.0.3\build\native\UltrafastSecp256k1-vc145.targets" Condition="Exists('$(NuGetPackageRoot)UltrafastSecp256k1-vc145.4.5.0.3\build\native\UltrafastSecp256k1-vc145.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Enable NuGet Package Restore to download them. For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The Missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('$(NuGetPackageRoot)libbitcoin-boost.1.91.0\build\libbitcoin-boost.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)libbitcoin-boost.1.91.0\build\libbitcoin-boost.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)libbitcoin-boost_container-vc145.1.91.0\build\libbitcoin-boost_container-vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)libbitcoin-boost_container-vc145.1.91.0\build\libbitcoin-boost_container-vc145.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)libbitcoin-boost_iostreams-vc145.1.91.0\build\libbitcoin-boost_iostreams-vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)libbitcoin-boost_iostreams-vc145.1.91.0\build\libbitcoin-boost_iostreams-vc145.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)libbitcoin-boost_json-vc145.1.91.0\build\libbitcoin-boost_json-vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)libbitcoin-boost_json-vc145.1.91.0\build\libbitcoin-boost_json-vc145.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)libbitcoin-boost_locale-vc145.1.91.0\build\libbitcoin-boost_locale-vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)libbitcoin-boost_locale-vc145.1.91.0\build\libbitcoin-boost_locale-vc145.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)libbitcoin-boost_program_options-vc145.1.91.0\build\libbitcoin-boost_program_options-vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)libbitcoin-boost_program_options-vc145.1.91.0\build\libbitcoin-boost_program_options-vc145.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)libbitcoin-boost_thread-vc145.1.91.0\build\libbitcoin-boost_thread-vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)libbitcoin-boost_thread-vc145.1.91.0\build\libbitcoin-boost_thread-vc145.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)libbitcoin-boost_unit_test_framework-vc145.1.91.0\build\libbitcoin-boost_unit_test_framework-vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)libbitcoin-boost_unit_test_framework-vc145.1.91.0\build\libbitcoin-boost_unit_test_framework-vc145.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)libbitcoin-boost_url-vc145.1.91.0\build\libbitcoin-boost_url-vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)libbitcoin-boost_url-vc145.1.91.0\build\libbitcoin-boost_url-vc145.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)secp256k1_vc145.0.8.0\build\native\secp256k1_vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)secp256k1_vc145.0.8.0\build\native\secp256k1_vc145.targets'))" />
-    <Error Condition="!Exists('$(NuGetPackageRoot)UltrafastSecp256k1-vc145.4.5.0.3\build\native\UltrafastSecp256k1-vc145.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(NuGetPackageRoot)UltrafastSecp256k1-vc145.4.5.0.3\build\native\UltrafastSecp256k1-vc145.targets'))" />
   </Target>
   <ItemGroup>
     <ProjectReference Include="..\libbitcoin-system\libbitcoin-system.vcxproj">

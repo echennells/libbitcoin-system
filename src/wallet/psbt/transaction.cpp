@@ -51,31 +51,6 @@ constexpr size_t xpub_size = 78;
 const uint32_t transaction::version_0 = 0;
 const uint32_t transaction::version_2 = 2;
 
-// Serialization emits repeated-type entries in key order (deterministic).
-static entry::list sorted(const entry::list& entries) NOEXCEPT
-{
-    auto copy = entries;
-    std::sort(copy.begin(), copy.end(),
-        [](const entry& left, const entry& right) NOEXCEPT
-        {
-            return left.key < right.key;
-        });
-
-    return copy;
-}
-
-static xpub::list sorted(const xpub::list& entries) NOEXCEPT
-{
-    auto copy = entries;
-    std::sort(copy.begin(), copy.end(),
-        [](const xpub& left, const xpub& right) NOEXCEPT
-        {
-            return left.key < right.key;
-        });
-
-    return copy;
-}
-
 // The full key of each pair must be unique within the map.
 static bool is_duplicate(std_vector<data_chunk>& keys,
     const data_chunk& key) NOEXCEPT
@@ -111,6 +86,11 @@ transaction::transaction() NOEXCEPT
 {
 }
 
+transaction::transaction(uint32_t tx_version) NOEXCEPT
+  : valid_(true), version_(version_2), tx_version_(tx_version)
+{
+}
+
 transaction::transaction(const data_chunk& decoded) NOEXCEPT
   : transaction(from_data(decoded))
 {
@@ -122,12 +102,13 @@ transaction::transaction(const std::string& encoded) NOEXCEPT
 }
 
 transaction::transaction(const chain::transaction& unsigned_tx) NOEXCEPT
-  : transaction(from_transaction(unsigned_tx))
+  : transaction(from_transaction(unsigned_tx, version_0))
 {
 }
 
-transaction::transaction(uint32_t tx_version) NOEXCEPT
-  : valid_(true), version_(version_2), tx_version_(tx_version)
+transaction::transaction(const chain::transaction& unsigned_tx,
+    uint32_t version) NOEXCEPT
+  : transaction(from_transaction(unsigned_tx, version))
 {
 }
 
@@ -150,8 +131,9 @@ transaction transaction::from_string(const std::string& encoded) NOEXCEPT
     return decode_base64(decoded, encoded) ? transaction(decoded) : transaction{};
 }
 
-// The creator role (BIP174).
-transaction transaction::from_transaction(const chain::transaction& tx) NOEXCEPT
+// The creator role (BIP174 version 0, BIP370 version 2).
+transaction transaction::from_transaction(const chain::transaction& tx,
+    uint32_t version) NOEXCEPT
 {
     const auto unsigned_input = [](const auto& in) NOEXCEPT
     {
@@ -159,15 +141,41 @@ transaction transaction::from_transaction(const chain::transaction& tx) NOEXCEPT
     };
 
     const auto& inputs = *tx.inputs_ptr();
-    if (!tx.is_valid() ||
-        !std::all_of(inputs.begin(), inputs.end(), unsigned_input))
+    const auto& outputs = *tx.outputs_ptr();
+    if (!tx.is_valid() || (version != version_0 && version != version_2) ||
+        !std::all_of(inputs.cbegin(), inputs.cend(), unsigned_input))
         return {};
 
     transaction out{};
     out.valid_ = true;
-    out.tx_ = tx;
+    out.version_ = version;
     out.inputs_.resize(inputs.size());
-    out.outputs_.resize(tx.outputs_ptr()->size());
+    out.outputs_.resize(outputs.size());
+    if (version == version_0)
+    {
+        out.tx_ = tx;
+        return out;
+    }
+
+    out.tx_version_ = tx.version();
+    out.fallback_locktime_ = tx.locktime();
+    for (size_t index{}; index < inputs.size(); ++index)
+    {
+        const auto& in = *inputs.at(index);
+        auto& put = out.inputs_.at(index);
+        put.previous_txid = in.point().hash();
+        put.output_index = in.point().index();
+        put.sequence = in.sequence();
+    }
+
+    for (size_t index{}; index < outputs.size(); ++index)
+    {
+        const auto& output = *outputs.at(index);
+        auto& put = out.outputs_.at(index);
+        put.amount = output.value();
+        put.script = output.script_ptr();
+    }
+
     return out;
 }
 
@@ -180,12 +188,14 @@ bool transaction::parse(reader& source) NOEXCEPT
         source.read_byte() != psbt_separator)
         return false;
 
-    if (!parse_global(source))
+    size_t input_count{};
+    size_t output_count{};
+    if (!parse_global(source, input_count, output_count))
         return false;
 
     const auto version0 = (version_ == version_0);
-    const auto ins = version0 ? tx_.inputs_ptr()->size() : inputs_.size();
-    const auto outs = version0 ? tx_.outputs_ptr()->size() : outputs_.size();
+    const auto ins = version0 ? tx_.inputs_ptr()->size() : input_count;
+    const auto outs = version0 ? tx_.outputs_ptr()->size() : output_count;
 
     inputs_.clear();
     for (auto count = ins; !is_zero(count); --count)
@@ -210,7 +220,8 @@ bool transaction::parse(reader& source) NOEXCEPT
     return source.is_exhausted();
 }
 
-bool transaction::parse_global(reader& source) NOEXCEPT
+bool transaction::parse_global(reader& source, size_t& input_count,
+    size_t& output_count) NOEXCEPT
 {
     std_vector<data_chunk> keys{};
     entry entry{};
@@ -218,13 +229,18 @@ bool transaction::parse_global(reader& source) NOEXCEPT
     bool has_tx_version{};
     bool has_input_count{};
     bool has_output_count{};
-    size_t input_count{};
-    size_t output_count{};
 
     while (entry.from_data(source))
     {
         if (is_duplicate(keys, entry.key))
             return false;
+
+        // Only core types are typed, larger ones are preserved untyped.
+        if (entry.type() > max_uint8)
+        {
+            others_.push_back(std::move(entry));
+            continue;
+        }
 
         auto data = entry.keydata();
         const auto typed = data.empty();
@@ -242,7 +258,7 @@ bool transaction::parse_global(reader& source) NOEXCEPT
                 tx_ = chain::transaction{ tx, false };
                 const auto& inputs = *tx_.inputs_ptr();
                 if (!typed || !tx_.is_valid() || !tx.is_exhausted() ||
-                    !std::all_of(inputs.begin(), inputs.end(),
+                    !std::all_of(inputs.cbegin(), inputs.cend(),
                         unsigned_input))
                     return false;
 
@@ -330,8 +346,6 @@ bool transaction::parse_global(reader& source) NOEXCEPT
             !has_output_count)
             return false;
 
-        inputs_.resize(input_count);
-        outputs_.resize(output_count);
         return true;
     }
 
@@ -404,7 +418,7 @@ data_chunk transaction::to_chunk() const NOEXCEPT
     if (version_ == version_0)
         write(sink, global_key::unsigned_tx, {}, tx_.to_data(false));
 
-    for (const auto& key: sorted(xpubs_))
+    for (const auto& key: sort_copy(xpubs_))
         write(sink, global_key::xpub, key.key,
             key.origin.to_value());
 
@@ -439,7 +453,7 @@ data_chunk transaction::to_chunk() const NOEXCEPT
             system::to_chunk(to_little_endian(version_)));
     }
 
-    for (const auto& field: sorted(others_))
+    for (const auto& field: sort_copy(others_))
         field.to_data(sink);
 
     sink.write_byte(psbt_terminator);
@@ -519,7 +533,7 @@ bool transaction::is_final() const NOEXCEPT
     };
 
     return valid_ && !inputs_.empty() &&
-        std::all_of(inputs_.begin(), inputs_.end(), finalized);
+        std::all_of(inputs_.cbegin(), inputs_.cend(), finalized);
 }
 
 chain::output::cptr transaction::prevout(size_t input) const NOEXCEPT
@@ -685,9 +699,11 @@ bool transaction::join(const transaction& other) NOEXCEPT
     const auto other_point = [&other](size_t index) NOEXCEPT
     {
         return (other.version_ == transaction::version_0) ?
-            other.tx_.inputs_ptr()->at(index)->point() :
-            chain::point{ other.inputs_.at(index).previous_txid.value_or(
-                null_hash), other.inputs_.at(index).output_index.value_or(0) };
+            other.tx_.inputs_ptr()->at(index)->point() : chain::point
+            {
+                other.inputs_.at(index).previous_txid.value_or(null_hash),
+                other.inputs_.at(index).output_index.value_or(0)
+            };
     };
 
     // Duplicated input points cannot be joined.
@@ -702,16 +718,19 @@ bool transaction::join(const transaction& other) NOEXCEPT
         auto outputs = *tx_.outputs_ptr();
         const auto& more_ins = *other.tx_.inputs_ptr();
         const auto& more_outs = *other.tx_.outputs_ptr();
-        inputs.insert(inputs.end(), more_ins.begin(), more_ins.end());
-        outputs.insert(outputs.end(), more_outs.begin(), more_outs.end());
-        tx_ = { tx_.version(), to_shared(std::move(inputs)),
-            to_shared(std::move(outputs)), tx_.locktime() };
+        inputs.insert(inputs.cend(), more_ins.cbegin(), more_ins.cend());
+        outputs.insert(outputs.cend(), more_outs.cbegin(), more_outs.cend());
+        tx_ =
+        {
+            tx_.version(),
+            to_shared(std::move(inputs)),
+            to_shared(std::move(outputs)),
+            tx_.locktime()
+        };
     }
 
-    inputs_.insert(inputs_.end(), other.inputs_.begin(),
-        other.inputs_.end());
-    outputs_.insert(outputs_.end(), other.outputs_.begin(),
-        other.outputs_.end());
+    inputs_.insert(inputs_.cend(), other.inputs_.cbegin(), other.inputs_.cend());
+    outputs_.insert(outputs_.cend(), other.outputs_.cbegin(), other.outputs_.cend());
     return true;
 }
 
@@ -722,7 +741,7 @@ bool transaction::join(const transaction& other) NOEXCEPT
 static entry::list::const_iterator find_entry_by_hash(
     const entry::list& signatures, const short_hash& hash) NOEXCEPT
 {
-    return std::find_if(signatures.begin(), signatures.end(),
+    return std::find_if(signatures.cbegin(), signatures.cend(),
         [&](const auto& item) NOEXCEPT
         {
             return bitcoin_short_hash(item.keydata()) == hash;
@@ -733,7 +752,7 @@ static entry::list::const_iterator find_entry_by_hash(
 static entry::list::const_iterator find_entry_by_key(
     const entry::list& signatures, const data_chunk& key) NOEXCEPT
 {
-    return std::find_if(signatures.begin(), signatures.end(),
+    return std::find_if(signatures.cbegin(), signatures.cend(),
         [&](const auto& item) NOEXCEPT
         {
             return item.keydata() == key;
@@ -748,7 +767,7 @@ static bool satisfy(data_stack& stack, const script& spend,
     if (script::is_pay_public_key_pattern(ops))
     {
         const auto found = find_entry_by_key(signatures, ops.front().data());
-        if (found == signatures.end())
+        if (found == signatures.cend())
             return false;
 
         stack.push_back(found->value);
@@ -758,9 +777,9 @@ static bool satisfy(data_stack& stack, const script& spend,
     if (script::is_pay_key_hash_pattern(ops))
     {
         const auto hash = unsafe_array_cast<uint8_t, short_hash_size>(
-            ops.at(2).data().data());
+            ops.at(two).data().data());
         const auto found = find_entry_by_hash(signatures, hash);
-        if (found == signatures.end())
+        if (found == signatures.cend())
             return false;
 
         stack.push_back(found->value);
@@ -777,11 +796,11 @@ static bool satisfy(data_stack& stack, const script& spend,
         stack.push_back(data_chunk{});
 
         // Signatures are ordered by public key position in the script.
-        for (auto op = std::next(ops.begin());
-            op != std::prev(ops.end(), 2); ++op)
+        for (auto op = std::next(ops.cbegin());
+            op != std::prev(ops.cend(), two); ++op)
         {
             const auto found = find_entry_by_key(signatures, op->data());
-            if (found != signatures.end())
+            if (found != signatures.cend())
                 stack.push_back(found->value);
         }
 
@@ -816,7 +835,7 @@ bool transaction::finalize(input& in, uint32_t index) NOEXCEPT
             return false;
 
         const auto hash = unsafe_array_cast<uint8_t, short_hash_size>(
-            spend.ops().at(1).data().data());
+            spend.ops().at(one).data().data());
         if (rmd160_hash(in.embedded_script->hash()) != hash)
             return false;
 
@@ -830,7 +849,7 @@ bool transaction::finalize(input& in, uint32_t index) NOEXCEPT
             return false;
 
         const auto hash = unsafe_array_cast<uint8_t, hash_size>(
-            spend.ops().at(1).data().data());
+            spend.ops().at(one).data().data());
         if (in.witness_script->hash() != hash)
             return false;
 
@@ -907,8 +926,7 @@ bool transaction::finalize() NOEXCEPT
 chain::input::cptr transaction::extract_input(size_t index) const NOEXCEPT
 {
     const auto& in = inputs_.at(index);
-    const auto script_sig = in.final_script_sig ? *in.final_script_sig :
-        script{};
+    const auto script_sig = in.final_script_sig ? *in.final_script_sig : script{};
     const auto script_witness = in.final_script_witness ?
         *in.final_script_witness : witness{};
 
@@ -942,7 +960,7 @@ chain::transaction transaction::extract() const NOEXCEPT
     if (version_ == version_0)
     {
         const auto& puts = *tx_.outputs_ptr();
-        outputs.assign(puts.begin(), puts.end());
+        outputs.assign(puts.cbegin(), puts.cend());
     }
     else
     {

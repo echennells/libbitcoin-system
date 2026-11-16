@@ -8,34 +8,78 @@
 # Script managing the build and installation of libbitcoin-system and its dependencies.
 #
 # Script options:
-# -Denable-avx2=<ON/OFF>      Use Intel AVX2 intrinsics.
-#                               Default: OFF
-# -Denable-avx512=<ON/OFF>    Use Intel AVX512 intrinsics.
-#                               Default: OFF
-# -Denable-sse41=<ON/OFF>     Use SSE4.1 hardware instructions.
-#                               Default: OFF
-# -Denable-shani=<ON/OFF>     Use Intel/ARM SHA Extensions.
-#                               Default: OFF
-# -Dwith-ultrafast=<ON/OFF>   Use shrec/UltrafastSecp256k1 library.
-#                               Default: OFF
-# -Dwith-secp256k1=<ON/OFF>   Use bitcoin-core/secp256k1 library.
-#                               Default: ON
-# --build-boost               Build Boost libraries
-# --build-secp256k1           Build libsecp256k1 libraries
-# --build-ultrafast           Build UltrafastSecp256k1 libraries
-# --build-preset=<preset>     Specifies preset configuration to build.
-# --build-src-dir=<path>      Location for sources.
-#                               Default: $(pwd)
-# --build-full-repositories   Sync full github repositories.
-#                               Default: git clone --depth 1 --single-branch
-# --build-post-install-clean  Clean dependencies after installation (saves space).
-# --build-skip-tests          Skip test compilation and execution.
-# --build-parallel=<int>      Number of jobs to run simultaneously.
-#                               Default: supported platforms use nproc/sysctl
-# --build-use-local-src       Use existing sources in relevant paths.
-# --noninteractive            Disable any prompt using default.
-# --verbose                   Display verbose script output.
-# --help, -h                  Display usage, overriding script execution.
+
+# --build-libsecp256k1         Build bitcoin core libsecp256k1 libraries
+# --build-preset=<preset>      Specifies preset configuration to build.
+# --build-src-dir=<path>       Location for sources.
+#                                Default: $(pwd)
+# --build-limit=<limit>        Limitation at which the process will terminate.
+#                                Values: { none, target, dependencies, external }
+#                                Default: none
+# --build-full-repositories    Sync full github repositories.
+#                                Default: git clone --depth 1 --single-branch
+# --build-post-install-clean   Clean dependencies after installation (saves space).
+# --build-skip-tests           Skip test compilation and execution.
+# --build-skip-test-run        Compile tests without executing them.
+# --build-parallel=<int>       Number of jobs to run simultaneously.
+#                                Default: supported platforms use nproc/sysctl
+# --build-use-local-src        Use existing sources in relevant paths.
+# --hardware-optimized         Inform compiler to apply applicable optimizations for the host hardware.
+# --noninteractive             Disable any prompt using default.
+# --verbose                    Display verbose script output.
+# --help, -h                   Display usage, overriding script execution.
+#
+# Hardware configuration options for arm64:
+# --hardware-aes               Use ARM AES and PMULL Extensions.
+# --hardware-sha2              Use ARM SHA1/SHA256 Extensions (implies AES).
+# --hardware-sha3              Use ARM SHA3 Extensions for SHA512 (implies SHA1/SHA256 and AES).
+#
+# Hardware configuration options for x64:
+# --hardware-avx2              Use Intel AVX2 intrinsics (implies AES-NI).
+# --hardware-avx512            Use Intel AVX512 intrinsics (implies AVX2 and AES-NI).
+# --hardware-avx512ifma        Use Intel AVX512 IFMA intrinsics (implies AVX512, SHA Extensions and AES-NI).
+# --hardware-avxifma           Use Intel AVX IFMA intrinsics (implies AVX2, SHA Extensions and AES-NI).
+# --hardware-shani             Use Intel SHA Extensions (implies AES-NI).
+# --hardware-sha512            Use Intel SHA512 Extensions (implies AVX2).
+# --hardware-sse41             Use SSE4.1 hardware instructions.
+# --hardware-aesni             Use Intel AES-NI and PCLMULQDQ intrinsics.
+# --hardware-vaes              Use Intel VAES and VPCLMULQDQ intrinsics (implies AES-NI and AVX2).
+#
+# Recognized pass-through options:
+# -Denable-shani=<ON/OFF>      Add Intel SHA Extensions (implies AES-NI) via compilation options.
+#                                Default: OFF
+# -Denable-sha512=<ON/OFF>     Add Intel SHA512 Extensions (implies AVX2) via compilation options.
+#                                Default: OFF
+# -Denable-aesni=<ON/OFF>      Add Intel AES-NI and PCLMULQDQ intrinsics via compilation options.
+#                                Default: OFF
+# -Denable-vaes=<ON/OFF>       Add Intel VAES and VPCLMULQDQ intrinsics (implies AES-NI and AVX2) via compilation options.
+#                                Default: OFF
+# -Denable-avx512ifma=<ON/OFF> Add Intel AVX512 IFMA intrinsics (implies AVX512, SHA Extensions and AES-NI) via compilation options.
+#                                Default: OFF
+# -Denable-avx512=<ON/OFF>     Add Intel AVX512 intrinsics (implies AVX2 and AES-NI) via compilation options.
+#                                Default: OFF
+# -Denable-avxifma=<ON/OFF>    Add Intel AVX IFMA intrinsics (implies AVX2, SHA Extensions and AES-NI) via compilation options.
+#                                Default: OFF
+# -Denable-avx2=<ON/OFF>       Add Intel AVX2 intrinsics (implies AES-NI) via compilation options.
+#                                Default: OFF
+# -Denable-sse41=<ON/OFF>      Add SSE4.1 hardware instructions via compilation options.
+#                                Default: OFF
+# -Denable-sha2=<ON/OFF>       Check for ARM SHA1/SHA256 Extensions (implies AES).
+#                                Default: OFF
+# -Denable-sha3=<ON/OFF>       Check for ARM SHA3 Extensions for SHA512 (implies SHA1/SHA256 and AES).
+#                                Default: OFF
+# -Denable-aes=<ON/OFF>        Check for ARM AES and PMULL Extensions.
+#                                Default: OFF
+# -Dwith-secp256k1=<ON/OFF>    Use native secp256k1 interface, otherwise external library.
+#                                Default: ON
+# -Dwith-valgrind=<ON/OFF>     Use valgrind memcheck client requests.
+#                                Default: OFF
+# -Dwith-cuda=<ON/OFF>         Use cuda (gpu) batch signature verification (inert on macOS).
+#                                Default: ON
+# -Dwith-performance-tests=<ON/OFF> Compile performance tests.
+#                                Default: OFF
+# -Dwith-slow-tests=<ON/OFF>   Compile slow tests.
+#                                Default: OFF
 #
 # All unrecognized options provided shall be passed as configuration
 # options for all dependencies.
@@ -48,25 +92,11 @@ trap 'echo "FATAL ERROR: Command failed at line ${LINENO}: ${BASH_COMMAND}" >&2'
 
 SEQUENTIAL=1
 
-if [[ -z ${boost_URLBASE} ]]; then
-    boost_URLBASE="https://archives.boost.io/release/1.86.0/source/"
-fi
-if [[ -z ${boost_FILENAME} ]]; then
-    boost_FILENAME="boost_1_86_0.tar.bz2"
-fi
-
 if [[ -z ${secp256k1_OWNER} ]]; then
     secp256k1_OWNER="bitcoin-core"
 fi
 if [[ -z ${secp256k1_TAG} ]]; then
     secp256k1_TAG="v0.8.0"
-fi
-
-if [[ -z ${UltrafastSecp256k1_OWNER} ]]; then
-    UltrafastSecp256k1_OWNER="shrec"
-fi
-if [[ -z ${UltrafastSecp256k1_TAG} ]]; then
-    UltrafastSecp256k1_TAG="main"
 fi
 
 if [[ -z ${libbitcoin_system_OWNER} ]]; then
@@ -82,16 +112,29 @@ main()
 
     for OPTION in "$@"; do
         case ${OPTION} in
-            (--build-boost)                 BUILD_boost="yes";;
-            (--build-secp256k1)             BUILD_secp256k1="yes";;
-            (--build-ultrafast)             BUILD_ultrafast="yes";;
+            (--build-libsecp256k1)          BUILD_libsecp256k1="yes";;
+            (--hardware-aes)                HARDWARE_AES="yes";;
+            (--hardware-sha2)               HARDWARE_SHA2="yes";;
+            (--hardware-sha3)               HARDWARE_SHA3="yes";;
+            (--hardware-avx2)               HARDWARE_AVX2="yes";;
+            (--hardware-avx512)             HARDWARE_AVX512="yes";;
+            (--hardware-avx512ifma)         HARDWARE_AVX512IFMA="yes";;
+            (--hardware-avxifma)            HARDWARE_AVXIFMA="yes";;
+            (--hardware-shani)              HARDWARE_SHANI="yes";;
+            (--hardware-sha512)             HARDWARE_SHA512="yes";;
+            (--hardware-sse41)              HARDWARE_SSE41="yes";;
+            (--hardware-aesni)              HARDWARE_AESNI="yes";;
+            (--hardware-vaes)               HARDWARE_VAES="yes";;
             (--build-preset=*)              BUILD_PRESET="${OPTION#*=}";;
             (--build-src-dir=*)             BUILD_SRC_DIR="${OPTION#*=}";;
+            (--build-limit=*)               BUILD_LIMIT="${OPTION#*=}";;
             (--build-full-repositories)     BUILD_FULL_REPOSITORIES="yes";;
             (--build-post-install-clean)    BUILD_POST_INSTALL_CLEAN="yes";;
             (--build-skip-tests)            BUILD_SKIP_TESTS="yes";;
+            (--build-skip-test-run)         BUILD_SKIP_TEST_RUN="yes";;
             (--build-parallel=*)            PARALLEL="${OPTION#*=}";;
             (--build-use-local-src)         BUILD_USE_LOCAL_SRC="yes";;
+            (--hardware-optimized)          HARDWARE_OPTIMIZED="yes";;
             (--noninteractive)              NONINTERACTIVE="yes";;
             (--verbose)                     DISPLAY_VERBOSE="yes";;
             (--help|-h)                     DISPLAY_HELP="yes";;
@@ -104,20 +147,33 @@ main()
 
     CONFIGURE_OPTIONS_ORIGINAL=("$@")
     CONFIGURE_OPTIONS=("$@")
-    CONFIGURE_OPTIONS=("${CONFIGURE_OPTIONS[@]/--build-boost/}")
-    CONFIGURE_OPTIONS=("${CONFIGURE_OPTIONS[@]/--build-secp256k1/}")
-    CONFIGURE_OPTIONS=("${CONFIGURE_OPTIONS[@]/--build-ultrafast/}")
-    CONFIGURE_OPTIONS=("${CONFIGURE_OPTIONS[@]/--build-preset=*/}")
-    CONFIGURE_OPTIONS=("${CONFIGURE_OPTIONS[@]/--build-src-dir=*/}")
-    CONFIGURE_OPTIONS=("${CONFIGURE_OPTIONS[@]/--build-full-repositories/}")
-    CONFIGURE_OPTIONS=("${CONFIGURE_OPTIONS[@]/--build-post-install-clean/}")
-    CONFIGURE_OPTIONS=("${CONFIGURE_OPTIONS[@]/--build-skip-tests/}")
-    CONFIGURE_OPTIONS=("${CONFIGURE_OPTIONS[@]/--build-parallel=*/}")
-    CONFIGURE_OPTIONS=("${CONFIGURE_OPTIONS[@]/--build-use-local-src/}")
-    CONFIGURE_OPTIONS=("${CONFIGURE_OPTIONS[@]/--noninteractive/}")
-    CONFIGURE_OPTIONS=("${CONFIGURE_OPTIONS[@]/--verbose/}")
-    CONFIGURE_OPTIONS=("${CONFIGURE_OPTIONS[@]/--help/}")
-    CONFIGURE_OPTIONS=("${CONFIGURE_OPTIONS[@]/-h/}")
+    remove_configure_option "--build-libsecp256k1"
+    remove_configure_option "--build-preset=*"
+    remove_configure_option "--build-src-dir=*"
+    remove_configure_option "--build-limit=*"
+    remove_configure_option "--build-full-repositories"
+    remove_configure_option "--build-post-install-clean"
+    remove_configure_option "--build-skip-tests"
+    remove_configure_option "--build-skip-test-run"
+    remove_configure_option "--build-parallel=*"
+    remove_configure_option "--build-use-local-src"
+    remove_configure_option "--hardware-optimized"
+    remove_configure_option "--noninteractive"
+    remove_configure_option "--verbose"
+    remove_configure_option "--help"
+    remove_configure_option "-h"
+    remove_configure_option "--hardware-aes"
+    remove_configure_option "--hardware-sha2"
+    remove_configure_option "--hardware-sha3"
+    remove_configure_option "--hardware-avx2"
+    remove_configure_option "--hardware-avx512"
+    remove_configure_option "--hardware-avx512ifma"
+    remove_configure_option "--hardware-avxifma"
+    remove_configure_option "--hardware-shani"
+    remove_configure_option "--hardware-sha512"
+    remove_configure_option "--hardware-sse41"
+    remove_configure_option "--hardware-aesni"
+    remove_configure_option "--hardware-vaes"
     CONFIGURE_OPTIONS_CMAKE=("${CONFIGURE_OPTIONS[@]}")
     msg_verbose "*** ARGUMENTS: ${CONFIGURE_OPTIONS_ORIGINAL[*]}"
     msg_verbose "*** SANITIZED: ${CONFIGURE_OPTIONS[*]}"
@@ -158,6 +214,38 @@ main()
         BUILD_LINK="static"
     elif [[ "${BUILD_PRESET}" == "nix-gnu-release-shared" ]]; then
         msg_verbose "BUILD_PRESET value 'nix-gnu-release-shared'."
+        BUILD_CONFIG="release"
+        BUILD_LINK="dynamic"
+    elif [[ "${BUILD_PRESET}" == "win-msvc-debug-static" ]]; then
+        msg_verbose "BUILD_PRESET value 'win-msvc-debug-static'."
+        BUILD_CONFIG="debug"
+        BUILD_LINK="static"
+    elif [[ "${BUILD_PRESET}" == "win-msvc-release-static" ]]; then
+        msg_verbose "BUILD_PRESET value 'win-msvc-release-static'."
+        BUILD_CONFIG="release"
+        BUILD_LINK="static"
+    elif [[ "${BUILD_PRESET}" == "win-msvc-debug-shared" ]]; then
+        msg_verbose "BUILD_PRESET value 'win-msvc-debug-shared'."
+        BUILD_CONFIG="debug"
+        BUILD_LINK="dynamic"
+    elif [[ "${BUILD_PRESET}" == "win-msvc-release-shared" ]]; then
+        msg_verbose "BUILD_PRESET value 'win-msvc-release-shared'."
+        BUILD_CONFIG="release"
+        BUILD_LINK="dynamic"
+    elif [[ "${BUILD_PRESET}" == "win-clangcl-debug-static" ]]; then
+        msg_verbose "BUILD_PRESET value 'win-clangcl-debug-static'."
+        BUILD_CONFIG="debug"
+        BUILD_LINK="static"
+    elif [[ "${BUILD_PRESET}" == "win-clangcl-release-static" ]]; then
+        msg_verbose "BUILD_PRESET value 'win-clangcl-release-static'."
+        BUILD_CONFIG="release"
+        BUILD_LINK="static"
+    elif [[ "${BUILD_PRESET}" == "win-clangcl-debug-shared" ]]; then
+        msg_verbose "BUILD_PRESET value 'win-clangcl-debug-shared'."
+        BUILD_CONFIG="debug"
+        BUILD_LINK="dynamic"
+    elif [[ "${BUILD_PRESET}" == "win-clangcl-release-shared" ]]; then
+        msg_verbose "BUILD_PRESET value 'win-clangcl-release-shared'."
         BUILD_CONFIG="release"
         BUILD_LINK="dynamic"
     else
@@ -212,6 +300,21 @@ main()
         msg_verbose "Determined absolute path for --build-obj-dir '${BUILD_OBJ_DIR}'."
     fi
 
+    # --build-limit
+    if [[ -z "${BUILD_LIMIT}" ]]; then
+        BUILD_LIMIT="none"
+        msg_verbose "No --build-limit specified."
+    elif [[ "${BUILD_LIMIT}" != "none" ]] &&
+        [[ "${BUILD_LIMIT}" != "target" ]] &&
+        [[ "${BUILD_LIMIT}" != "dependencies" ]] &&
+        [[ "${BUILD_LIMIT}" != "external" ]]; then
+        msg_error "Provided --build-limit '${BUILD_LIMIT}' not a valid value."
+        help
+        exit 1
+    else
+        msg_verbose "Using provided --build-limit '${BUILD_LIMIT}'"
+    fi
+
     # --build-config
     if [[ -z "${BUILD_CONFIG}" ]]; then
         msg_verbose "No --build-config specified."
@@ -243,16 +346,18 @@ main()
         msg_verbose "No --prefix specified, defaulting to '${PREFIX}'."
     else
         # Incorporate the custom libdir into each object, for link time resolution
-        if [[ -z "${LD_RUN_PATH}" ]]; then
-            export LD_RUN_PATH="${PREFIX}/lib"
-        else
-            export LD_RUN_PATH="${LD_RUN_PATH}:${PREFIX}/lib"
-        fi
+        if [[ "${BUILD_LINK}" == "dynamic" ]]; then
+            if [[ -z "${LD_RUN_PATH}" ]]; then
+                export LD_RUN_PATH="${PREFIX}/lib"
+            else
+                export LD_RUN_PATH="${LD_RUN_PATH}:${PREFIX}/lib"
+            fi
 
-        if [[ -z "${LD_LIBRARY_PATH}" ]]; then
-            export LD_LIBRARY_PATH="${PREFIX}/lib"
-        else
-            export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${PREFIX}/lib"
+            if [[ -z "${LD_LIBRARY_PATH}" ]]; then
+                export LD_LIBRARY_PATH="${PREFIX}/lib"
+            else
+                export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${PREFIX}/lib"
+            fi
         fi
     fi
 
@@ -297,8 +402,10 @@ main()
     if [[ -z "${PARALLEL}" ]]; then
         if [[ ${OS} == Linux ]]; then
             PARALLEL=$(nproc)
-        elif [[ ${OS} == Darwin ]] || [[ ${OS} == OpenBSD ]]; then
+        elif [[ ${OS} == Darwin ]] || [[ ${OS} == *BSD ]]; then
             PARALLEL=$(sysctl -n hw.ncpu)
+        elif [[ ${OS} == MINGW* ]] || [[ ${OS} == MSYS* ]]; then
+            PARALLEL=${NUMBER_OF_PROCESSORS}
         else
             msg_error "Unsupported system: '${OS}'"
             msg_error "  Unable to determine value for --build-parallel"
@@ -311,27 +418,23 @@ main()
 
     # state rationalization of standard build variables
 
-    if [[ ${OS} == OpenBSD ]]; then
+    if [[ ${OS} == *BSD ]]; then
         make() { gmake "$@"; }
     fi
 
     if [[ -z "${STDLIB}" ]]; then
         if [[ ${OS} == Darwin ]]; then
             STDLIB="c++"
-        elif [[ ${OS} == OpenBSD ]]; then
-            STDLIB="estdc++"
         else
             STDLIB="stdc++"
         fi
     else
-        define_message_verbose "STDLIB using defined value '${STDLIB}'"
+        msg_verbose "STDLIB using defined value '${STDLIB}'"
     fi
 
     if [[ -z "${CC}" ]]; then
         if [[ ${OS} == Darwin ]]; then
             export CC="clang"
-        elif [[ ${OS} == OpenBSD ]]; then
-            export CC="egcc"
         fi
     else
         msg_verbose "CC using defined value '${CC}'"
@@ -340,41 +443,152 @@ main()
     if [[ -z "${CXX}" ]]; then
         if [[ ${OS} == Darwin ]]; then
             export CXX="clang++"
-        elif [[ ${OS} == OpenBSD ]]; then
-            export CXX="eg++"
         fi
     else
         msg_verbose "CXX using defined value '${CXX}'"
     fi
 
-    # translate BUILD_CONFIG to ZFLAGS
-    if [[ -n "${BUILD_CONFIG}" ]]; then
-        msg_verbose "*** Build config specified, calculating flags..."
-
-        if [[ "${BUILD_CONFIG}" == "debug" ]]; then
-            BUILD_FLAGS="-Og -g1"
-        elif [[ "${BUILD_CONFIG}" == "release" ]]; then
-            BUILD_FLAGS="-O3"
+    if [[ -z "${MACOSX_DEPLOYMENT_TARGET}" ]]; then
+        if [[ ${OS} == Darwin ]]; then
+            export MACOSX_DEPLOYMENT_TARGET=$(sw_vers -productVersion)
         fi
-
-        if [[ -z "${CFLAGS}" ]]; then
-            export CFLAGS="${BUILD_FLAGS}"
-            msg_verbose "Exporting CFLAGS '${CFLAGS}'"
-        else
-            msg_verbose "CFLAGS initially '${CFLAGS}'"
-            export CFLAGS="${CFLAGS} ${BUILD_FLAGS}"
-            msg_verbose "CFLAGS modified to '${CFLAGS}'"
-        fi
-
-        if [[ -z "${CXXFLAGS}" ]]; then
-            export CXXFLAGS="${BUILD_FLAGS}"
-            msg_verbose "Exporting CXXFLAGS '${CXXFLAGS}'"
-        else
-            msg_verbose "CXXFLAGS initially '${CXXFLAGS}'"
-            export CXXFLAGS="${CXXFLAGS} ${BUILD_FLAGS}"
-            msg_verbose "CXXFLAGS modified to '${CXXFLAGS}'"
-        fi
+    else
+        msg_verbose "MACOSX_DEPLOYMENT_TARGET using defined value '${MACOSX_DEPLOYMENT_TARGET}'"
     fi
+
+    # HARDWARE_OPTIMIZED
+    if [[ "${HARDWARE_OPTIMIZED}" == "yes" ]]; then
+        ARCHTUNE="-march=native -mtune=native"
+    fi
+
+    if [[ "${HARDWARE_SHA2}" == "yes" ]]; then
+        HARDWARE_AES="yes"
+    fi
+
+    if [[ "${HARDWARE_SHA3}" == "yes" ]]; then
+        HARDWARE_SHA2="yes"
+        HARDWARE_AES="yes"
+    fi
+
+    if [[ "${HARDWARE_AVX2}" == "yes" ]]; then
+        HARDWARE_AESNI="yes"
+    fi
+
+    if [[ "${HARDWARE_AVX512}" == "yes" ]]; then
+        HARDWARE_AVX2="yes"
+        HARDWARE_AESNI="yes"
+    fi
+
+    if [[ "${HARDWARE_AVX512IFMA}" == "yes" ]]; then
+        HARDWARE_AVX512="yes"
+        HARDWARE_AVX2="yes"
+        HARDWARE_SHANI="yes"
+        HARDWARE_AESNI="yes"
+    fi
+
+    if [[ "${HARDWARE_AVXIFMA}" == "yes" ]]; then
+        HARDWARE_AVX2="yes"
+        HARDWARE_SHANI="yes"
+        HARDWARE_AESNI="yes"
+    fi
+
+    if [[ "${HARDWARE_SHANI}" == "yes" ]]; then
+        HARDWARE_AESNI="yes"
+    fi
+
+    # Platform options: arm64
+
+    if [[ "${HARDWARE_AES}" == "yes" ]]; then
+        HARDWARE_PLATFORM_ARM64="yes"
+        ARCHBASE="armv8-a"
+        ARCHSUFFIX="${ARCHSUFFIX}+aes"
+        CONFIGURE_OPTIONS_CMAKE=( "${CONFIGURE_OPTIONS_CMAKE[@]}" "-Denable-aes=ON" )
+    fi
+
+    if [[ "${HARDWARE_SHA2}" == "yes" ]]; then
+        HARDWARE_PLATFORM_ARM64="yes"
+        ARCHBASE="armv8-a"
+        ARCHSUFFIX="${ARCHSUFFIX}+sha2"
+        CONFIGURE_OPTIONS_CMAKE=( "${CONFIGURE_OPTIONS_CMAKE[@]}" "-Denable-sha2=ON" )
+    fi
+
+    if [[ "${HARDWARE_SHA3}" == "yes" ]]; then
+        HARDWARE_PLATFORM_ARM64="yes"
+        ARCHBASE="armv8.2-a"
+        ARCHSUFFIX="${ARCHSUFFIX}+sha3"
+        CONFIGURE_OPTIONS_CMAKE=( "${CONFIGURE_OPTIONS_CMAKE[@]}" "-Denable-sha3=ON" )
+    fi
+
+    if [[ ${HARDWARE_PLATFORM_ARM64} == "yes" ]]; then
+        ARCHTUNE="-march=${ARCHBASE}${ARCHSUFFIX}"
+    fi
+
+    # Platform options: x64
+
+    if [[ "${HARDWARE_AVX2}" == "yes" ]]; then
+        HARDWARE_PLATFORM_X64="yes"
+        CONFIGURE_OPTIONS_CMAKE=( "${CONFIGURE_OPTIONS_CMAKE[@]}" "-Denable-avx2=ON" )
+    fi
+
+    if [[ "${HARDWARE_AVX512}" == "yes" ]]; then
+        HARDWARE_PLATFORM_X64="yes"
+        CONFIGURE_OPTIONS_CMAKE=( "${CONFIGURE_OPTIONS_CMAKE[@]}" "-Denable-avx512=ON" )
+    fi
+
+    if [[ "${HARDWARE_AVX512IFMA}" == "yes" ]]; then
+        HARDWARE_PLATFORM_X64="yes"
+        CONFIGURE_OPTIONS_CMAKE=( "${CONFIGURE_OPTIONS_CMAKE[@]}" "-Denable-avx512ifma=ON" )
+    fi
+
+    if [[ "${HARDWARE_AVXIFMA}" == "yes" ]]; then
+        HARDWARE_PLATFORM_X64="yes"
+        CONFIGURE_OPTIONS_CMAKE=( "${CONFIGURE_OPTIONS_CMAKE[@]}" "-Denable-avxifma=ON" )
+    fi
+
+    if [[ "${HARDWARE_SHANI}" == "yes" ]]; then
+        HARDWARE_PLATFORM_X64="yes"
+        CONFIGURE_OPTIONS_CMAKE=( "${CONFIGURE_OPTIONS_CMAKE[@]}" "-Denable-shani=ON" )
+    fi
+
+    if [[ "${HARDWARE_SHA512}" == "yes" ]]; then
+        HARDWARE_PLATFORM_X64="yes"
+        CONFIGURE_OPTIONS_CMAKE=( "${CONFIGURE_OPTIONS_CMAKE[@]}" "-Denable-sha512=ON" )
+    fi
+
+    if [[ "${HARDWARE_SSE41}" == "yes" ]]; then
+        HARDWARE_PLATFORM_X64="yes"
+        CONFIGURE_OPTIONS_CMAKE=( "${CONFIGURE_OPTIONS_CMAKE[@]}" "-Denable-sse41=ON" )
+    fi
+
+    if [[ "${HARDWARE_AESNI}" == "yes" ]]; then
+        HARDWARE_PLATFORM_X64="yes"
+        CONFIGURE_OPTIONS_CMAKE=( "${CONFIGURE_OPTIONS_CMAKE[@]}" "-Denable-aesni=ON" )
+    fi
+
+    if [[ "${HARDWARE_VAES}" == "yes" ]]; then
+        HARDWARE_PLATFORM_X64="yes"
+        CONFIGURE_OPTIONS_CMAKE=( "${CONFIGURE_OPTIONS_CMAKE[@]}" "-Denable-vaes=ON" )
+    fi
+
+    HARDWARE_PLATFORM_COUNT=0
+    if [[ ${HARDWARE_PLATFORM_ARM64} == "yes" ]]; then
+        HARDWARE_PLATFORM_COUNT=$((HARDWARE_PLATFORM_COUNT + 1))
+    fi
+    if [[ ${HARDWARE_PLATFORM_X64} == "yes" ]]; then
+        HARDWARE_PLATFORM_COUNT=$((HARDWARE_PLATFORM_COUNT + 1))
+    fi
+
+    if [ ${HARDWARE_PLATFORM_COUNT} -gt 1 ]; then
+        msg_error "Hardware options spanning more than one platform have been specified."
+        exit 1
+    fi
+
+    if [[ "${HARDWARE_OPTIMIZED}" == "yes" ]] &&
+        [ ${HARDWARE_PLATFORM_COUNT} -gt 0 ]; then
+        msg_error "Hardware optimization cannot be reliably rationalized with hardware platform options."
+        exit 1
+    fi
+
 
     # Specify cmake build
     if [[ "${BUILD_CONFIG}" == "debug" ]]; then
@@ -394,17 +608,12 @@ main()
         fi
     fi
 
-    if [[ ${OS} == Linux && ${CC} == clang* ]] || [[ ${OS} == OpenBSD ]]; then
+    if [[ ${OS} == Linux && ${CC} == clang* ]]; then
         export LDLIBS="-l${STDLIB} ${LDLIBS}"
         msg_verbose "LDLIBS has been manipulated to encode STDLIB linkage."
     fi
 
     # defaults and sanitization: generated options
-
-    if [[ -n "${BUILD_boost}" ]]; then
-        export BOOST_ROOT="${PREFIX}"
-        with_boost="--with-boost=${PREFIX}"
-    fi
 
 
     REMAP=()
@@ -429,20 +638,6 @@ main()
 
     # declarations
 
-    boost_FLAGS=(
-        "-Wno-enum-constexpr-conversion")
-
-    boost_OPTIONS=(
-        "--with-container"
-        "--with-iostreams"
-        "--with-json"
-        "--with-locale"
-        "--with-program_options"
-        "--with-regex"
-        "--with-thread"
-        "--with-url"
-        "--with-test")
-
     secp256k1_FLAGS=(
         "-w")
 
@@ -453,136 +648,43 @@ main()
         "-DSECP256K1_ENABLE_MODULE_RECOVERY=ON"
         "-DSECP256K1_ENABLE_MODULE_SCHNORRSIG=ON")
 
-    UltrafastSecp256k1_FLAGS=()
-
-    UltrafastSecp256k1_OPTIONS=(
-        "-DSECP256K1_BUILD_CABI=ON"
-        "-DSECP256K1_BUILD_CPU=ON"
-        "-DSECP256K1_BUILD_SHIM=ON"
-        "-DSECP256K1_USE_ULTRAFAST=ON"
-        "-DSECP256K1_BUILD_BENCH=OFF"
-        "-DSECP256K1_BUILD_EXAMPLES=OFF"
-        "-DSECP256K1_BUILD_JAVA=OFF"
-        "-DSECP256K1_BUILD_TESTS=OFF"
-        "-DSECP256K1_SHIM_BUILD_SHARED=OFF"
-        "-DUFSECP_BUILD_SHARED=OFF"
-        "-DSECP256K1_INSTALL=ON"
-        "-DSECP256K1_SHIM_INSTALL=ON"
-        "-DSECP256K1_INSTALL_PKGCONFIG=ON")
-
     libbitcoin_system_FLAGS=()
 
     libbitcoin_system_OPTIONS=()
 
-    if [[ ${BUILD_boost} == "yes" ]]; then
-        source_archive "boost" "${boost_FILENAME}" "${boost_URLBASE}" "bzip2"
-        local SAVE_CPPFLAGS="${CPPFLAGS}"
-        export CPPFLAGS="${CPPFLAGS} ${boost_FLAGS[@]}"
-        build_boost "boost" "${boost_OPTIONS[@]}"
-        export CPPFLAGS="${SAVE_CPPFLAGS}"
+    if [[ ${BUILD_LIMIT} == "external" ]] ||
+       [[ ${BUILD_LIMIT} == "dependencies" ]] ||
+       [[ ${BUILD_LIMIT} == "none" ]]; then
+        if [[ ${BUILD_libsecp256k1} == "yes" ]]; then
+            source_github "${secp256k1_OWNER}" "secp256k1" "${secp256k1_TAG}"
+            local SAVE_CPPFLAGS="${CPPFLAGS}"
+            export CPPFLAGS="${CPPFLAGS} ${secp256k1_FLAGS[@]}"
+            build_cmake "secp256k1" "." "." "${PARALLEL}" "${secp256k1_OPTIONS[@]}" "${CONFIGURE_OPTIONS_CMAKE[@]}"
+            install_cmake "secp256k1" "."
+            if [[ "${BUILD_POST_INSTALL_CLEAN}" == "yes" ]]; then
+                clean_cmake "secp256k1" "."
+            fi
+            export CPPFLAGS="${SAVE_CPPFLAGS}"
+        fi
     fi
 
-    if [[ ${BUILD_secp256k1} == "yes" ]]; then
-        source_github "${secp256k1_OWNER}" "secp256k1" "${secp256k1_TAG}"
+    if [[ ${BUILD_LIMIT} == "target" ]] ||
+       [[ ${BUILD_LIMIT} == "none" ]]; then
+        source_github "${libbitcoin_system_OWNER}" "libbitcoin-system" "${libbitcoin_system_TAG}"
         local SAVE_CPPFLAGS="${CPPFLAGS}"
-        export CPPFLAGS="${CPPFLAGS} ${secp256k1_FLAGS[@]}"
-        build_cmake "secp256k1" "." "." "${PARALLEL}" "${secp256k1_OPTIONS[@]}" "${CONFIGURE_OPTIONS_CMAKE[@]}"
-        install_cmake "secp256k1" "."
+        export CPPFLAGS="${CPPFLAGS} ${libbitcoin_system_FLAGS[@]}"
+        build_preset "libbitcoin-system" "builds/cmake" "." "${PARALLEL}" "${libbitcoin_system_OPTIONS[@]}" "${CONFIGURE_OPTIONS_CMAKE[@]}"
+        if ! [[ "${BUILD_SKIP_TESTS}" == "yes" || "${BUILD_SKIP_TEST_RUN}" == "yes" ]]; then
+            test_cmake "libbitcoin-system" "." "${PARALLEL}"
+        fi
+        install_cmake "libbitcoin-system" "."
         if [[ "${BUILD_POST_INSTALL_CLEAN}" == "yes" ]]; then
-            clean_cmake "secp256k1" "."
+            clean_cmake "libbitcoin-system" "."
         fi
         export CPPFLAGS="${SAVE_CPPFLAGS}"
     fi
-
-    if [[ ${BUILD_ultrafast} == "yes" ]]; then
-        source_github "${UltrafastSecp256k1_OWNER}" "UltrafastSecp256k1" "${UltrafastSecp256k1_TAG}"
-        local SAVE_CPPFLAGS="${CPPFLAGS}"
-        export CPPFLAGS="${CPPFLAGS} ${UltrafastSecp256k1_FLAGS[@]}"
-        build_cmake "UltrafastSecp256k1" "." "." "${PARALLEL}" "${UltrafastSecp256k1_OPTIONS[@]}" "${CONFIGURE_OPTIONS_CMAKE[@]}"
-        install_cmake "UltrafastSecp256k1" "."
-        if [[ "${BUILD_POST_INSTALL_CLEAN}" == "yes" ]]; then
-            clean_cmake "UltrafastSecp256k1" "."
-        fi
-        export CPPFLAGS="${SAVE_CPPFLAGS}"
-    fi
-
-    source_github "${libbitcoin_system_OWNER}" "libbitcoin-system" "${libbitcoin_system_TAG}"
-    local SAVE_CPPFLAGS="${CPPFLAGS}"
-    export CPPFLAGS="${CPPFLAGS} ${libbitcoin_system_FLAGS[@]}"
-    build_preset "libbitcoin-system" "builds/cmake" "." "${PARALLEL}" "${libbitcoin_system_OPTIONS[@]}" "${CONFIGURE_OPTIONS_CMAKE[@]}"
-    if ! [[ "${BUILD_SKIP_TESTS}" == "yes" ]]; then
-        test_cmake "libbitcoin-system" "." "${PARALLEL}"
-    fi
-    install_cmake "libbitcoin-system" "."
-    if [[ "${BUILD_POST_INSTALL_CLEAN}" == "yes" ]]; then
-        clean_cmake "libbitcoin-system" "."
-    fi
-    export CPPFLAGS="${SAVE_CPPFLAGS}"
 
     msg_success "Completed successfully."
-}
-
-source_archive()
-{
-    local PROJECT="$1"
-    local FILENAME="$2"
-    local URL_BASE="$3"
-    local COMPRESSION="$4"
-    shift 4
-
-    msg_heading "Preparing to acquire ${PROJECT}"
-
-    push_directory "${BUILD_SRC_DIR}"
-
-    if [ -d "${PROJECT}" ] &&
-       [[ "${BUILD_USE_LOCAL_SRC}" == "yes" ]]; then
-        msg_warn "Reusing existing '${PROJECT}' directory..."
-        return 0
-    fi
-
-    if [ -d "${PROJECT}" ]; then
-        msg_warn "Encountered existing '${PROJECT}' directory..."
-        if [[ "${NONINTERACTIVE}" == "yes" ]]; then
-            CONFIRM="N"
-        else
-            read -p "Replace '${PROJECT}' directory with intended contents? [y/N] " CONFIRM
-        fi
-
-        if [[ "$(printf '%s' "${CONFIRM}" | tr '[:upper:]' '[:lower:]')" == "y" ]]; then
-            remove_directory_force "${PROJECT}"
-        else
-            msg_error "Aborted installation."
-            exit 0
-        fi
-    fi
-
-    msg "Retrieving ${PROJECT}..."
-
-    create_directory "${PROJECT}"
-    push_directory "${PROJECT}"
-
-    local TAR="tar"
-    local WGET="wget --quiet"
-    local CURL="curl --fail --silent --show-error --location"
-
-    # retrieve file, preferring wget (curl fallback for macOS)
-    if command -v wget >/dev/null 2>&1; then
-        ${WGET} --output-document "${FILENAME}" "${URL_BASE}${FILENAME}"
-    else
-        ${CURL} --output "${FILENAME}" "${URL_BASE}${FILENAME}"
-    fi
-
-    # extract to expected path
-    ${TAR} --extract --file "${FILENAME}" --${COMPRESSION} --strip-components=1
-    # ${TAR} --extract --file "${FILENAME}" "--${COMPRESSION}" --strip-components=1
-
-    # pop ${PROJECT}
-    pop_directory
-
-    # pop ${BUILD_SRC_DIR}
-    pop_directory
-
-    msg_success "Completed download and extraction successfully."
 }
 
 github_repository_status()
@@ -645,93 +747,6 @@ source_github()
 
     github_repository_status "${REPOSITORY}"
     pop_directory # pop BUILD_SRC_DIR
-}
-
-build_boost()
-{
-    local PROJECT="$1"
-    shift
-
-    msg_heading "Preparing to build ${PROJECT}"
-
-    push_directory "${BUILD_SRC_DIR}/${PROJECT}"
-
-    local SAVE_IFS="${IFS}"
-    IFS=' '
-
-    # Compute configuration
-    if [[ "${BUILD_LINK}" == "dynamic" ]]; then
-        BOOST_LINK="shared"
-    elif [[ "${BUILD_LINK}" == "static" ]]; then
-        BOOST_LINK="static"
-    else
-        BOOST_LINK="static,shared"
-    fi
-
-    if [[ -n ${CC} ]]; then
-        BOOST_TOOLSET="toolset=${CC}"
-    fi
-
-    if [[ (${OS} == Linux && ${CC} == clang*) || (${OS} == OpenBSD) ]]; then
-        STDLIB_FLAG="-stdlib=lib${STDLIB}"
-        BOOST_CXXFLAGS="cxxflags=${STDLIB_FLAG}"
-        BOOST_LINKFLAGS="linkflags=${STDLIB_FLAG}"
-    fi
-
-    guessed_toolset=`${BUILD_SRC_DIR}/${PROJECT}/tools/build/src/engine/build.sh --guess-toolset`
-    CXXFLAGS="-w" ${BUILD_SRC_DIR}/${PROJECT}/tools/build/src/engine/build.sh ${guessed_toolset} --cxxflags="-w"
-    cp "${BUILD_SRC_DIR}/${PROJECT}/tools/build/src/engine/b2" .
-
-    if [[ -n "${BOOST_CXXFLAGS}" ]]; then
-        BOOST_CXXFLAGS="${BOOST_CXXFLAGS} ${boost_FLAGS[@]}"
-    else
-        BOOST_CXXFLAGS="cxxflags=${boost_FLAGS[@]}"
-    fi
-
-    # Prebuild status report
-    msg "${PROJECT} configuration."
-    msg "--------------------------------------------------------------------"
-    msg "variant               : release"
-    msg "threading             : multi"
-    msg "toolset               : ${CC}"
-    msg "boost cxxflags        : ${BOOST_CXXFLAGS}"
-    msg "boost linkflags       : ${BOOST_LINKFLAGS}"
-    msg "link                  : ${BOOST_LINK}"
-    msg "-sNO_BZIP2            : 1"
-    msg "-sNO_ZSTD             : 1"
-    msg "-j                    : ${PARALLEL}"
-    msg "-d0                   : [suppress informational messages]"
-    msg "-q                    : [stop at the first error]"
-    msg "--reconfigure         : [ignore cached configuration]"
-    msg "--prefix              : ${PREFIX}"
-    msg "BOOST_OPTIONS         : $*"
-    msg "cxxflags (ignored)    : ${CXXFLAGS}"
-    msg "--------------------------------------------------------------------"
-
-    # Begin build
-    ./bootstrap.sh --with-bjam=./b2 --prefix=${PREFIX}
-
-    ./b2 install \
-        "cxxstd=20" \
-        "variant=release" \
-        "threading=multi" \
-        "${BOOST_TOOLSET}" \
-        "${BOOST_CXXFLAGS}" \
-        "${BOOST_LINKFLAGS}" \
-        "link=${BOOST_LINK}" \
-        "warnings=off" \
-        "-sNO_BZIP2=1" \
-        "-sNO_ZSTD=1" \
-        "-j ${PARALLEL}" \
-        "-d0" \
-        "-q" \
-        "--reconfigure" \
-        "--prefix=${PREFIX}" \
-        "$@"
-
-    IFS="${SAVE_IFS}"
-
-    pop_directory # BUILD_SRC_DIR
 }
 
 build_cmake()
@@ -808,7 +823,7 @@ build_preset()
 
     if [[ "${DISPLAY_VERBOSE}" == "yes" ]]; then
         VERBOSITY_CMAKE="-DCMAKE_VERBOSE_MAKEFILE=ON"
-        VERBOSITY_MAKE="VERBOSE=1"
+        VERBOSITY_MAKE="--verbose"
     fi
 
     msg_heading "Preparing to build ${PROJECT}"
@@ -839,11 +854,10 @@ build_preset()
 
     cmake ${VERBOSITY_CMAKE} -LA --preset="${BUILD_PRESET}" "$@" "${BUILD_SRC_DIR}/${PROJECT}/${RELATIVE_SRC_PATH}"
 
-    # make
     if [[ ${JOBS} -gt ${SEQUENTIAL} ]]; then
-        make -j${JOBS} ${VERBOSITY_MAKE}
+        cmake --build . -j${JOBS} ${VERBOSITY_MAKE}
     else
-        make
+        cmake --build . ${VERBOSITY_MAKE}
     fi
 
     pop_directory # BUILD_OBJ_DIR
@@ -988,10 +1002,9 @@ test_cmake()
 
 display_build_variables()
 {
-    msg "BUILD_boost                     : ${BUILD_boost}"
-    msg "BUILD_secp256k1                 : ${BUILD_secp256k1}"
-    msg "BUILD_ultrafast                 : ${BUILD_ultrafast}"
+    msg "BUILD_libsecp256k1              : ${BUILD_libsecp256k1}"
     msg "BUILD_PRESET                    : ${BUILD_PRESET}"
+    msg "BUILD_LIMIT                     : ${BUILD_LIMIT}"
     msg "BUILD_SRC_DIR                   : ${BUILD_SRC_DIR}"
     msg "BUILD_OBJ_DIR                   : ${BUILD_OBJ_DIR}"
     msg "BUILD_OBJ_DIR_RELATIVE          : ${BUILD_OBJ_DIR_RELATIVE}"
@@ -1001,6 +1014,7 @@ display_build_variables()
     msg "BUILD_POST_INSTALL_CLEAN        : ${BUILD_POST_INSTALL_CLEAN}"
     msg "BUILD_USE_LOCAL_SRC             : ${BUILD_USE_LOCAL_SRC}"
     msg "BUILD_SKIP_TESTS                : ${BUILD_SKIP_TESTS}"
+    msg "BUILD_SKIP_TEST_RUN             : ${BUILD_SKIP_TEST_RUN}"
     msg "PARALLEL                        : ${PARALLEL}"
     msg "PREFIX                          : ${PREFIX}"
     msg "DISPLAY_VERBOSE                 : ${DISPLAY_VERBOSE}"
@@ -1017,11 +1031,12 @@ display_toolchain_variables()
     msg "CFLAGS                          : ${CFLAGS}"
     msg "CXX                             : ${CXX}"
     msg "CXXFLAGS                        : ${CXXFLAGS}"
+    msg "LDFLAGS                         : ${LDFLAGS}"
+    msg "LDADD                           : ${LDADD}"
     msg "LD_RUN_PATH                     : ${LD_RUN_PATH}"
     msg "LD_LIBRARY_PATH                 : ${LD_LIBRARY_PATH}"
     msg "PKG_CONFIG_PATH                 : ${PKG_CONFIG_PATH}"
     msg "LDLIBS                          : ${LDLIBS}"
-    msg "BOOST_ROOT                      : ${BOOST_ROOT}"
     msg "CMAKE_PREFIX_PATH               : ${CMAKE_PREFIX_PATH}"
     msg "CMAKE_INSTALL_PREFIX            : ${CMAKE_INSTALL_PREFIX}"
     msg "CMAKE_INCLUDE_PATH              : ${CMAKE_INCLUDE_PATH}"
@@ -1030,14 +1045,9 @@ display_toolchain_variables()
 
 display_constants()
 {
-    msg "boost_URLBASE                   : ${boost_URLBASE}"
-    msg "boost_FILENAME                  : ${boost_FILENAME}"
 
     msg "secp256k1_OWNER                 : ${secp256k1_OWNER}"
     msg "secp256k1_TAG                   : ${secp256k1_TAG}"
-
-    msg "UltrafastSecp256k1_OWNER        : ${UltrafastSecp256k1_OWNER}"
-    msg "UltrafastSecp256k1_TAG          : ${UltrafastSecp256k1_TAG}"
 
     msg "libbitcoin_system_OWNER         : ${libbitcoin_system_OWNER}"
     msg "libbitcoin_system_TAG           : ${libbitcoin_system_TAG}"
@@ -1048,34 +1058,78 @@ help()
     msg "Script managing the build and installation of libbitcoin-system and its dependencies."
     msg ""
     msg "Script options:"
-    msg "-Denable-avx2=<ON/OFF>      Use Intel AVX2 intrinsics."
-    msg "                              Default: OFF"
-    msg "-Denable-avx512=<ON/OFF>    Use Intel AVX512 intrinsics."
-    msg "                              Default: OFF"
-    msg "-Denable-sse41=<ON/OFF>     Use SSE4.1 hardware instructions."
-    msg "                              Default: OFF"
-    msg "-Denable-shani=<ON/OFF>     Use Intel/ARM SHA Extensions."
-    msg "                              Default: OFF"
-    msg "-Dwith-ultrafast=<ON/OFF>   Use shrec/UltrafastSecp256k1 library."
-    msg "                              Default: OFF"
-    msg "-Dwith-secp256k1=<ON/OFF>   Use bitcoin-core/secp256k1 library."
-    msg "                              Default: ON"
-    msg "--build-boost               Build Boost libraries"
-    msg "--build-secp256k1           Build libsecp256k1 libraries"
-    msg "--build-ultrafast           Build UltrafastSecp256k1 libraries"
-    msg "--build-preset=<preset>     Specifies preset configuration to build."
-    msg "--build-src-dir=<path>      Location for sources."
-    msg "                              Default: $(pwd)"
-    msg "--build-full-repositories   Sync full github repositories."
-    msg "                              Default: git clone --depth 1 --single-branch"
-    msg "--build-post-install-clean  Clean dependencies after installation (saves space)."
-    msg "--build-skip-tests          Skip test compilation and execution."
-    msg "--build-parallel=<int>      Number of jobs to run simultaneously."
-    msg "                              Default: supported platforms use nproc/sysctl"
-    msg "--build-use-local-src       Use existing sources in relevant paths."
-    msg "--noninteractive            Disable any prompt using default."
-    msg "--verbose                   Display verbose script output."
-    msg "--help, -h                  Display usage, overriding script execution."
+
+    msg "--build-libsecp256k1         Build bitcoin core libsecp256k1 libraries"
+    msg "--build-preset=<preset>      Specifies preset configuration to build."
+    msg "--build-src-dir=<path>       Location for sources."
+    msg "                               Default: $(pwd)"
+    msg "--build-limit=<limit>        Limitation at which the process will terminate."
+    msg "                               Values: { none, target, dependencies, external }"
+    msg "                               Default: none"
+    msg "--build-full-repositories    Sync full github repositories."
+    msg "                               Default: git clone --depth 1 --single-branch"
+    msg "--build-post-install-clean   Clean dependencies after installation (saves space)."
+    msg "--build-skip-tests           Skip test compilation and execution."
+    msg "--build-skip-test-run        Compile tests without executing them."
+    msg "--build-parallel=<int>       Number of jobs to run simultaneously."
+    msg "                               Default: supported platforms use nproc/sysctl"
+    msg "--build-use-local-src        Use existing sources in relevant paths."
+    msg "--hardware-optimized         Inform compiler to apply applicable optimizations for the host hardware."
+    msg "--noninteractive             Disable any prompt using default."
+    msg "--verbose                    Display verbose script output."
+    msg "--help, -h                   Display usage, overriding script execution."
+    msg ""
+    msg "Hardware configuration options for arm64:"
+    msg "--hardware-aes               Use ARM AES and PMULL Extensions."
+    msg "--hardware-sha2              Use ARM SHA1/SHA256 Extensions (implies AES)."
+    msg "--hardware-sha3              Use ARM SHA3 Extensions for SHA512 (implies SHA1/SHA256 and AES)."
+    msg ""
+    msg "Hardware configuration options for x64:"
+    msg "--hardware-avx2              Use Intel AVX2 intrinsics (implies AES-NI)."
+    msg "--hardware-avx512            Use Intel AVX512 intrinsics (implies AVX2 and AES-NI)."
+    msg "--hardware-avx512ifma        Use Intel AVX512 IFMA intrinsics (implies AVX512, SHA Extensions and AES-NI)."
+    msg "--hardware-avxifma           Use Intel AVX IFMA intrinsics (implies AVX2, SHA Extensions and AES-NI)."
+    msg "--hardware-shani             Use Intel SHA Extensions (implies AES-NI)."
+    msg "--hardware-sha512            Use Intel SHA512 Extensions (implies AVX2)."
+    msg "--hardware-sse41             Use SSE4.1 hardware instructions."
+    msg "--hardware-aesni             Use Intel AES-NI and PCLMULQDQ intrinsics."
+    msg "--hardware-vaes              Use Intel VAES and VPCLMULQDQ intrinsics (implies AES-NI and AVX2)."
+    msg ""
+    msg "Recognized pass-through options:"
+    msg "-Denable-shani=<ON/OFF>      Add Intel SHA Extensions (implies AES-NI) via compilation options."
+    msg "                               Default: OFF"
+    msg "-Denable-sha512=<ON/OFF>     Add Intel SHA512 Extensions (implies AVX2) via compilation options."
+    msg "                               Default: OFF"
+    msg "-Denable-aesni=<ON/OFF>      Add Intel AES-NI and PCLMULQDQ intrinsics via compilation options."
+    msg "                               Default: OFF"
+    msg "-Denable-vaes=<ON/OFF>       Add Intel VAES and VPCLMULQDQ intrinsics (implies AES-NI and AVX2) via compilation options."
+    msg "                               Default: OFF"
+    msg "-Denable-avx512ifma=<ON/OFF> Add Intel AVX512 IFMA intrinsics (implies AVX512, SHA Extensions and AES-NI) via compilation options."
+    msg "                               Default: OFF"
+    msg "-Denable-avx512=<ON/OFF>     Add Intel AVX512 intrinsics (implies AVX2 and AES-NI) via compilation options."
+    msg "                               Default: OFF"
+    msg "-Denable-avxifma=<ON/OFF>    Add Intel AVX IFMA intrinsics (implies AVX2, SHA Extensions and AES-NI) via compilation options."
+    msg "                               Default: OFF"
+    msg "-Denable-avx2=<ON/OFF>       Add Intel AVX2 intrinsics (implies AES-NI) via compilation options."
+    msg "                               Default: OFF"
+    msg "-Denable-sse41=<ON/OFF>      Add SSE4.1 hardware instructions via compilation options."
+    msg "                               Default: OFF"
+    msg "-Denable-sha2=<ON/OFF>       Check for ARM SHA1/SHA256 Extensions (implies AES)."
+    msg "                               Default: OFF"
+    msg "-Denable-sha3=<ON/OFF>       Check for ARM SHA3 Extensions for SHA512 (implies SHA1/SHA256 and AES)."
+    msg "                               Default: OFF"
+    msg "-Denable-aes=<ON/OFF>        Check for ARM AES and PMULL Extensions."
+    msg "                               Default: OFF"
+    msg "-Dwith-secp256k1=<ON/OFF>    Use native secp256k1 interface, otherwise external library."
+    msg "                               Default: ON"
+    msg "-Dwith-valgrind=<ON/OFF>     Use valgrind memcheck client requests."
+    msg "                               Default: OFF"
+    msg "-Dwith-cuda=<ON/OFF>         Use cuda (gpu) batch signature verification (inert on macOS)."
+    msg "                               Default: ON"
+    msg "-Dwith-performance-tests=<ON/OFF> Compile performance tests."
+    msg "                               Default: OFF"
+    msg "-Dwith-slow-tests=<ON/OFF>   Compile slow tests."
+    msg "                               Default: OFF"
     msg ""
     msg "All unrecognized options provided shall be passed as configuration"
     msg "options for all dependencies."
@@ -1089,6 +1143,21 @@ display_configure_options()
             msg "${OPTION}"
         fi
     done
+}
+
+remove_configure_option()
+{
+    local PATTERN="$1"
+    local RETAINED=()
+    local OPTION
+
+    for OPTION in "${CONFIGURE_OPTIONS[@]}"; do
+        if [[ ${OPTION} != ${PATTERN} ]]; then
+            RETAINED=("${RETAINED[@]}" "${OPTION}")
+        fi
+    done
+
+    CONFIGURE_OPTIONS=("${RETAINED[@]}")
 }
 
 

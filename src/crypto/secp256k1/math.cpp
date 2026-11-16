@@ -18,7 +18,6 @@
  */
 #include <bitcoin/system/crypto/secp256k1.hpp>
 
-#include <secp256k1.h>
 #include <bitcoin/system/data/data.hpp>
 #include <bitcoin/system/math/math.hpp>
 #include "ec_context.hpp"
@@ -37,7 +36,7 @@ static std::vector<const secp256k1_pubkey*> to_secp256k1_pubkey_pointers(
     const std::vector<secp256k1_pubkey>& keys) NOEXCEPT
 {
     std::vector<const secp256k1_pubkey*> pointers(keys.size());
-    std::transform(keys.begin(), keys.end(), pointers.begin(),
+    std::transform(keys.cbegin(), keys.cend(), pointers.begin(),
         [](const secp256k1_pubkey& point) NOEXCEPT
         {
             return &point;
@@ -121,6 +120,27 @@ bool ec_add(ec_compressed& left, const ec_uncompressed& right) NOEXCEPT
 {
     ec_compressed out;
     return compress(out, right) && ec_add(left, out);
+}
+
+bool ec_add(ec_uncompressed& left, const ec_uncompressed& right) NOEXCEPT
+{
+    const auto context = ec_context_verify::context();
+
+    std::array<secp256k1_pubkey, two> keys{};
+    if (!ec_public_key_parse(context, keys.front(), left) ||
+        !ec_public_key_parse(context, keys.back(), right))
+        return false;
+
+    secp256k1_pubkey out;
+    const std::array<const secp256k1_pubkey*, two> pointers
+    {
+        &keys.front(),
+        &keys.back()
+    };
+
+    return secp256k1_ec_pubkey_combine(context, &out, pointers.data(),
+        pointers.size()) == ec_success &&
+        ec_public_key_serialize(context, left, out);
 }
 
 bool ec_sum(ec_compressed& out, const ec_compresseds& points) NOEXCEPT

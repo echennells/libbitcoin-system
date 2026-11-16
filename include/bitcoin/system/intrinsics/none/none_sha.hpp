@@ -48,10 +48,120 @@ INLINE void unshuffle(xint128_t&, xint128_t&) NOEXCEPT
 {
 }
 
+INLINE void schedule_160(xint128_t&, xint128_t, xint128_t) NOEXCEPT
+{
+}
+
+INLINE void schedule_160(xint128_t&, xint128_t) NOEXCEPT
+{
+}
+
+template <size_t Round>
+INLINE void compress_160(xint128_t&, xint128_t&, xint128_t) NOEXCEPT
+{
+}
+
+INLINE xint128_t next_160(xint128_t, xint128_t e) NOEXCEPT
+{
+    return e;
+}
+
+INLINE xint128_t order_160(xint128_t message) NOEXCEPT
+{
+    return message;
+}
+
+INLINE void shuffle_160(xint128_t&) NOEXCEPT
+{
+}
+
+INLINE void unshuffle_160(xint128_t&) NOEXCEPT
+{
+}
+
+INLINE xint128_t set_160(uint32_t) NOEXCEPT
+{
+    return xint128_t{};
+}
+
+INLINE uint32_t get_160(xint128_t) NOEXCEPT
+{
+    return {};
+}
+
+INLINE void zeroupper() NOEXCEPT
+{
+}
+
 } // namespace sha
 } // namespace system
 } // namespace libbitcoin
 
 #endif // HAVE_SHA
+
+#if !defined(HAVE_SHA512)
+
+namespace libbitcoin {
+namespace system {
+namespace sha {
+
+/// Four 64 bit words.
+using xquad_t = std_array<uint8_t, bytes<256>>;
+
+INLINE xquad_t set_512(uint64_t, uint64_t, uint64_t, uint64_t) NOEXCEPT
+{
+    return {};
+}
+
+INLINE xquad_t load_512(const xquad_t& words) NOEXCEPT
+{
+    return words;
+}
+
+INLINE void store_512(xquad_t& words, xquad_t a) NOEXCEPT
+{
+    words = a;
+}
+
+INLINE xquad_t add_512(xquad_t a, xquad_t) NOEXCEPT
+{
+    return a;
+}
+
+INLINE void schedule_512(xquad_t&, xquad_t) NOEXCEPT
+{
+}
+
+INLINE void schedule_512(xquad_t&, xquad_t, xquad_t) NOEXCEPT
+{
+}
+
+INLINE void compress_512(xquad_t&, xquad_t&, xquad_t) NOEXCEPT
+{
+}
+
+INLINE void shuffle_512(xquad_t&, xquad_t&) NOEXCEPT
+{
+}
+
+INLINE void unshuffle_512(xquad_t&, xquad_t&) NOEXCEPT
+{
+}
+
+} // namespace sha
+
+namespace f {
+
+template <typename Word, if_same<Word, uint64_t> = true>
+INLINE sha::xquad_t byteswap(sha::xquad_t a) NOEXCEPT
+{
+    return a;
+}
+
+} // namespace f
+} // namespace system
+} // namespace libbitcoin
+
+#endif // HAVE_SHA512
 
 #endif

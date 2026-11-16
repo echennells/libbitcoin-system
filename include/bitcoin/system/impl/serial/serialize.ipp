@@ -19,10 +19,14 @@
 #ifndef LIBBITCOIN_SYSTEM_SERIAL_SERIALIZE_IPP
 #define LIBBITCOIN_SYSTEM_SERIAL_SERIALIZE_IPP
 
+#include <charconv>
+#include <cmath>
 #include <sstream>
 #include <bitcoin/system/data/data.hpp>
 #include <bitcoin/system/define.hpp>
+#include <bitcoin/system/math/math.hpp>
 #include <bitcoin/system/radix/radix.hpp>
+#include <bitcoin/system/serial/deserialize.hpp>
 
 namespace libbitcoin {
 namespace system {
@@ -41,6 +45,11 @@ inline std::string serialize(uint8_t value,
     const std::string& fallback) NOEXCEPT
 {
     return serialize(static_cast<uint16_t>(value), fallback);
+}
+
+inline std::string serialize(char value, const std::string&) NOEXCEPT
+{
+    return { value };
 }
 
 template <size_t Size>
@@ -66,7 +75,7 @@ std::string serialize(const std_array<Value, Size>& values,
         return serialize(value, fallback);
     };
 
-    std::transform(values.begin(), values.end(), tokens.begin(), serializer);
+    std::transform(values.cbegin(), values.cend(), tokens.begin(), serializer);
     return join(tokens);
 }
 
@@ -80,11 +89,17 @@ std::string serialize(const std_vector<Value>& values,
         return serialize(value, fallback);
     };
 
-    std::transform(values.begin(), values.end(), tokens.begin(), serializer);
+    std::transform(values.cbegin(), values.cend(), tokens.begin(), serializer);
     return join(tokens);
 }
 
-template <typename Value>
+template <typename Integer, if_integral<Integer>>
+std::string serialize(Integer value, const std::string&) NOEXCEPT
+{
+    return std::to_string(value);
+}
+
+template <typename Value, if_non_integral<Value>>
 std::string serialize(const Value& value, const std::string& fallback) NOEXCEPT
 {
     try
@@ -98,6 +113,31 @@ std::string serialize(const Value& value, const std::string& fallback) NOEXCEPT
     {
         return {};
     }
+}
+
+template <typename Float, if_floating_point<Float>>
+std::string serialize_fixed(Float value) NOEXCEPT
+{
+    if (!std::isfinite(value))
+        return serialize(value);
+
+    // Unspecified precision is the shortest text that converts to the value.
+    using limits = std::numeric_limits<Float>;
+    constexpr auto size = to_unsigned(add1(limits::max_exponent10)) +
+        fixed_decimals<Float> + two;
+    std_array<char, size> buffer{};
+    const auto first = buffer.data();
+    const auto last = std::next(first, size);
+    const auto [end, ec] = std::to_chars(first, last, value,
+        std::chars_format::fixed);
+    if (ec != std::errc{})
+        return {};
+
+    std::string token{ first, end };
+    if (token.find('.') == std::string::npos)
+        token += ".0";
+
+    return token;
 }
 
 } // namespace system

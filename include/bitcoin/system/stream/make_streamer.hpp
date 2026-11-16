@@ -24,11 +24,24 @@
 
 // Suppress multiple inheritance warnings.
 // The inheritance is virtual, so not actually multiple.
-// But the boost type constraint 'is_virtual_base_of' triggers the warning.
 BC_PUSH_WARNING(DIAMOND_INHERITANCE)
 
 namespace libbitcoin {
 namespace system {
+
+/// Base stream owner, destroyed after the streamer (which flushes on destruct).
+template <typename Stream>
+class stream_owner
+{
+protected:
+    template <typename Container>
+    stream_owner(Container&& device) NOEXCEPT
+      : owned_(std::forward<Container>(device))
+    {
+    }
+
+    Stream owned_;
+};
 
 /// Construct a stream and feed it to a streamer.
 template <typename Device,
@@ -36,19 +49,17 @@ template <typename Device,
     typename Stream = make_stream<Device>,
     typename Streamer = Base<Stream>>
 class make_streamer
-  : public Streamer
+  : private stream_owner<Stream>,
+    public Streamer
 {
 public:
     using ptr = std::shared_ptr<make_streamer<Device, Base, Stream, Streamer>>;
 
     make_streamer(typename Device::container device) NOEXCEPT
-      : Streamer(), stream_(device)
+      : stream_owner<Stream>(device), Streamer()
     {
-        Streamer::set_stream(&stream_);
+        Streamer::set_stream(&this->owned_);
     }
-
-private:
-    Stream stream_;
 };
 
 } // namespace system

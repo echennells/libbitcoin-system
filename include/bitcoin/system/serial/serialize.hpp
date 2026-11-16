@@ -21,6 +21,7 @@
 
 #include <bitcoin/system/data/data.hpp>
 #include <bitcoin/system/define.hpp>
+#include <bitcoin/system/math/math.hpp>
 
 namespace libbitcoin {
 namespace system {
@@ -42,6 +43,10 @@ void serialize(std::ostream& output, const Value& value,
 inline std::string serialize(uint8_t value,
     const std::string& fallback="") NOEXCEPT;
 
+/// Specialize char as its character.
+inline std::string serialize(char value,
+    const std::string& fallback="") NOEXCEPT;
+
 /// Specialize data_array to base16 (avoids join and fallback).
 template <size_t Size>
 std::string serialize(const data_array<Size>& value,
@@ -61,10 +66,27 @@ template <typename Value>
 std::string serialize(const std_vector<Value>& values,
     const std::string& fallback="?") NOEXCEPT;
 
+/// Specialize integrals as decimal text.
+template <typename Integer, if_integral<Integer> = true>
+std::string serialize(Integer value,
+    const std::string& fallback="") NOEXCEPT;
+
 /// General serializer.
-template <typename Value>
+template <typename Value, if_non_integral<Value> = true>
 std::string serialize(const Value& value,
     const std::string& fallback="") NOEXCEPT;
+
+/// The decimal places sufficient to express any finite floating point value
+/// in fixed notation, such that the text deserializes to the value.
+template <typename Float, if_floating_point<Float> = true>
+constexpr size_t fixed_decimals = to_unsigned(
+    std::numeric_limits<Float>::max_digits10 -
+    std::numeric_limits<Float>::min_exponent10);
+
+/// Shortest fixed notation, with a decimal, that deserializes to the value.
+/// Any non-finite value is serialized by the general serializer.
+template <typename Float, if_floating_point<Float> = true>
+std::string serialize_fixed(Float value) NOEXCEPT;
 
 } // namespace system
 } // namespace libbitcoin

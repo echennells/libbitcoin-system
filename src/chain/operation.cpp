@@ -216,8 +216,10 @@ operation operation::from_data(reader& source) NOEXCEPT
     if (size > max_bytes)
         source.invalidate();
 
-    // An invalid source.read_bytes_raw returns nullptr.
-    auto push = to_shared(source ? source.read_bytes(size) : data_chunk{});
+    chunk_cptr push{};
+    if (source && !is_zero(size))
+        push = to_shared(source.read_bytes(size));
+
     const auto underflow = !source;
 
     // This requires that provided stream terminates at the end of the script.
@@ -322,7 +324,7 @@ inline bool is_underflow_token(const std::string_view& token) NOEXCEPT
 inline std::string remove_token_delimiters(const std::string_view& token) NOEXCEPT
 {
     BC_ASSERT(token.size() > one);
-    return std::string{ std::next(token.begin()), std::prev(token.end()) };
+    return std::string{ std::next(token.cbegin()), std::prev(token.cend()) };
 }
 
 inline string_list split_push_token(const std::string_view& token) NOEXCEPT
@@ -497,7 +499,7 @@ static std::string bitcoind_data(const data_chunk& data,
     if (signature)
     {
         const auto suffix = sighash_suffix(data.back());
-        const data_slice der{ data.begin(), std::prev(data.end()) };
+        const data_slice der{ data.cbegin(), std::prev(data.cend()) };
         if (!suffix.empty() && ::is_valid_bip66_signature_encoding(der))
             return encode_base16(der) + suffix;
     }
@@ -607,6 +609,11 @@ bool operation::as_unsigned32(uint32_t& value) const NOEXCEPT
 
     value = sign_cast<uint32_t>(signed_value);
     return true;
+}
+
+bool operation::as_unpadded32(uint32_t& value) const NOEXCEPT
+{
+    return machine::number::chunk::is_minimal(data()) && as_unsigned32(value);
 }
 
 bool operation::as_unsigned40(uint64_t& value) const NOEXCEPT

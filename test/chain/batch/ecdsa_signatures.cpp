@@ -1,0 +1,153 @@
+/**
+ * Copyright (c) 2011-2026 libbitcoin developers
+ *
+ * This file is part of libbitcoin.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+#include "../../test.hpp"
+
+BC_AUTO_TEST_SUITE(ecdsa_signatures_tests)
+
+using namespace system::chain;
+
+const hash_digest sighash_bad = base16_array
+(
+    "4242424242424242424242424242424242424242424242424242424242424242"
+);
+const hash_digest ecdsa_sighash = base16_array
+(
+    "504d68beac187dd0b259ddd6ed6d5d6348150b9b23ee6dfdb43e87f74dd3c547"
+);
+const ec_compressed ecdsa_key = base16_array
+(
+    "039cfcfe4a5d0efad27382e5d2b478eb398a8b691a66e01c878b600b5042b33166"
+);
+const ec_signature ecdsa_sig = array_cast<uint8_t>(std_array<uint64_t, 8>
+{
+    0x713dd620c7c734b4_u64, 0x63fff70d746d13e1_u64,
+    0xae8903cb59ce7067_u64, 0x43f141440d4cd28c_u64,
+    0xb4326fc3dbe1f401_u64, 0xc6b2e4c8ecae3f68_u64,
+    0x3f78fd989ea60d81_u64, 0x08dac3365610ad1a_u64
+});
+
+BC_AUTO_TEST_CASE(ecdsa_signatures__default__empty)
+{
+    const ecdsa_signatures accumulator{};
+    BC_REQUIRE(accumulator.empty());
+    BC_REQUIRE_EQUAL(accumulator.groups(), zero);
+    BC_REQUIRE_EQUAL(accumulator.rows(), zero);
+    BC_REQUIRE_EQUAL(accumulator.singles(), zero);
+    BC_REQUIRE_EQUAL(accumulator.multisig_keys(), zero);
+    BC_REQUIRE(accumulator.verify());
+}
+
+BC_AUTO_TEST_CASE(ecdsa_signatures__append_single__expected_counts)
+{
+    ecdsa_signatures accumulator{};
+    BC_REQUIRE(accumulator.append(ecdsa_sighash, ecdsa_key, ecdsa_sig));
+    BC_REQUIRE(!accumulator.empty());
+    BC_REQUIRE_EQUAL(accumulator.groups(), 1u);
+    BC_REQUIRE_EQUAL(accumulator.rows(), 1u);
+    BC_REQUIRE_EQUAL(accumulator.singles(), 1u);
+    BC_REQUIRE_EQUAL(accumulator.multisig_keys(), zero);
+}
+
+BC_AUTO_TEST_CASE(ecdsa_signatures__append_multisig__expected_counts)
+{
+    // 2 of 3 multisig: banded rows = m * (n - m + 1) = 4.
+    const std::array<ec_compressed, 3> keys{ ecdsa_key, ecdsa_key, ecdsa_key };
+    const std::array<ec_signature, 2> sigs{ ecdsa_sig, ecdsa_sig };
+
+    ecdsa_signatures accumulator{};
+    BC_REQUIRE(accumulator.append(ecdsa_sighash, keys, sigs));
+    BC_REQUIRE_EQUAL(accumulator.groups(), 1u);
+    BC_REQUIRE_EQUAL(accumulator.rows(), 4u);
+    BC_REQUIRE_EQUAL(accumulator.singles(), zero);
+    BC_REQUIRE_EQUAL(accumulator.multisig_keys(), 3u);
+}
+
+BC_AUTO_TEST_CASE(ecdsa_signatures__append_multisig_1of1__counted_as_multisig)
+{
+    // Classification follows the capture path, not the group shape.
+    const std::array<ec_compressed, 1> keys{ ecdsa_key };
+    const std::array<ec_signature, 1> sigs{ ecdsa_sig };
+
+    ecdsa_signatures accumulator{};
+    BC_REQUIRE(accumulator.append(ecdsa_sighash, keys, sigs));
+    BC_REQUIRE_EQUAL(accumulator.groups(), 1u);
+    BC_REQUIRE_EQUAL(accumulator.rows(), 1u);
+    BC_REQUIRE_EQUAL(accumulator.singles(), zero);
+    BC_REQUIRE_EQUAL(accumulator.multisig_keys(), 1u);
+}
+
+BC_AUTO_TEST_CASE(ecdsa_signatures__for_each__expected_records)
+{
+    const std::array<ec_compressed, 2> keys{ ecdsa_key, ecdsa_key };
+    const std::array<ec_signature, 2> sigs{ ecdsa_sig, ecdsa_sig };
+
+    ecdsa_signatures accumulator{};
+    BC_REQUIRE(accumulator.append(ecdsa_sighash, ecdsa_key, ecdsa_sig));
+    BC_REQUIRE(accumulator.append(sighash_bad, keys, sigs));
+
+    size_t group{};
+    accumulator.for_each([&](const hash_digest& digest,
+        std::span<const ec_compressed> each_keys,
+        std::span<const ec_signature> each_sigs) NOEXCEPT
+    {
+        BC_CHECK_EQUAL(digest, is_zero(group) ? ecdsa_sighash : sighash_bad);
+        BC_CHECK_EQUAL(each_keys.size(), is_zero(group) ? one : two);
+        BC_CHECK_EQUAL(each_sigs.size(), is_zero(group) ? one : two);
+        BC_CHECK_EQUAL(each_keys.front(), ecdsa_key);
+        BC_CHECK_EQUAL(each_sigs.front(), ecdsa_sig);
+        ++group;
+    });
+
+    BC_REQUIRE_EQUAL(group, accumulator.groups());
+}
+
+BC_AUTO_TEST_CASE(ecdsa_signatures__verify_valid__true)
+{
+    ecdsa_signatures accumulator{};
+    BC_REQUIRE(accumulator.append(ecdsa_sighash, ecdsa_key, ecdsa_sig));
+    BC_REQUIRE(accumulator.verify());
+}
+
+BC_AUTO_TEST_CASE(ecdsa_signatures__verify_invalid__false)
+{
+    ecdsa_signatures accumulator{};
+    BC_REQUIRE(accumulator.append(ecdsa_sighash, ecdsa_key, ecdsa_sig));
+    BC_REQUIRE(accumulator.append(sighash_bad, ecdsa_key, ecdsa_sig));
+    BC_REQUIRE(!accumulator.verify());
+}
+
+BC_AUTO_TEST_CASE(ecdsa_signatures__clear__empty)
+{
+    ecdsa_signatures accumulator{};
+    BC_REQUIRE(accumulator.append(ecdsa_sighash, ecdsa_key, ecdsa_sig));
+    accumulator.clear();
+    BC_REQUIRE(accumulator.empty());
+    BC_REQUIRE_EQUAL(accumulator.rows(), zero);
+    BC_REQUIRE_EQUAL(accumulator.singles(), zero);
+}
+
+BC_AUTO_TEST_CASE(ecdsa_signatures__purge__empty)
+{
+    ecdsa_signatures accumulator{};
+    BC_REQUIRE(accumulator.append(ecdsa_sighash, ecdsa_key, ecdsa_sig));
+    accumulator.purge();
+    BC_REQUIRE(accumulator.empty());
+}
+
+BC_AUTO_TEST_SUITE_END()

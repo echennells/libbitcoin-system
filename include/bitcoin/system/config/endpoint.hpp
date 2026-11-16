@@ -44,8 +44,8 @@ public:
     /// The value is of the form: [scheme://]host[:port] (dns name or ip).
     endpoint(const std::string& uri) THROWS;
     endpoint(const std::string& host, uint16_t port) NOEXCEPT;
-    endpoint(const asio::endpoint& uri) NOEXCEPT;
-    endpoint(const asio::address& ip, uint16_t port) NOEXCEPT;
+    endpoint(const ip::endpoint& uri) NOEXCEPT;
+    endpoint(const ip::address& ip, uint16_t port) NOEXCEPT;
     endpoint(const config::authority& authority) NOEXCEPT;
 
     /// Properties.
@@ -73,9 +73,9 @@ public:
     /// Operators.
     /// -----------------------------------------------------------------------
 
-    friend std::istream& operator>>(std::istream& input,
+    friend BC_API std::istream& operator>>(std::istream& input,
         endpoint& argument) THROWS;
-    friend std::ostream& operator<<(std::ostream& output,
+    friend BC_API std::ostream& operator<<(std::ostream& output,
         const endpoint& argument) NOEXCEPT;
 
 private:

@@ -101,22 +101,78 @@ INLINE xint128_t byteswap(xint128_t) NOEXCEPT
     return {};
 }
 
+template <typename Integral = uint32_t, if_integral_integer<Integral> = true>
 INLINE xint128_t load(const xint128_t&) NOEXCEPT
 {
     return {};
 }
 
+template <typename Integral = uint32_t, if_integral_integer<Integral> = true>
 INLINE void store(xint128_t&, xint128_t) NOEXCEPT
 {
 }
 
+template <typename xWord, if_same<xWord, xint128_t> = true>
+INLINE xint128_t load(const uint8_t*) NOEXCEPT
+{
+    return {};
+}
+
+INLINE void store(uint8_t*, xint128_t) NOEXCEPT
+{
+}
+
+template <typename Integral = uint32_t, if_integral_integer<Integral> = true>
 INLINE xint128_t load_aligned(const xint128_t&) NOEXCEPT
 {
     return {};
 }
 
+template <typename Integral = uint32_t, if_integral_integer<Integral> = true>
 INLINE void store_aligned(xint128_t&, xint128_t) NOEXCEPT
 {
+}
+
+/// compare/select
+/// ---------------------------------------------------------------------------
+
+INLINE xint128_t andnot(xint128_t, xint128_t) NOEXCEPT
+{
+    return {};
+}
+
+template <auto S>
+INLINE xint128_t eq(xint128_t, xint128_t) NOEXCEPT
+{
+    return {};
+}
+
+INLINE xint128_t select(xint128_t, xint128_t, xint128_t) NOEXCEPT
+{
+    return {};
+}
+
+INLINE bool any(xint128_t) NOEXCEPT
+{
+    return false;
+}
+
+INLINE size_t first_unequal(xint128_t, xint128_t) NOEXCEPT
+{
+    return {};
+}
+
+/// gather
+/// ---------------------------------------------------------------------------
+
+INLINE xint128_t gather(const uint64_t*, xint128_t) NOEXCEPT
+{
+    return {};
+}
+
+INLINE xint128_t gather(const uint32_t*, xint128_t) NOEXCEPT
+{
+    return {};
 }
 
 /// interleave (for matrix transposition)

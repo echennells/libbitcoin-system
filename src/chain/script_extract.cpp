@@ -82,8 +82,8 @@ chunk_cptrs script::multisig_keys() const NOEXCEPT
         return keys;
 
     keys.reserve(ops().size() - 3u);
-    for (auto op = std::next(ops().begin());
-        op != std::prev(ops().end(), 2); ++op)
+    for (auto op = std::next(ops().cbegin());
+        op != std::prev(ops().cend(), 2); ++op)
         keys.push_back(op->data_ptr());
 
     return keys;
@@ -96,7 +96,7 @@ chunk_cptrs script::endorsements() const NOEXCEPT
         return sigs;
 
     sigs.reserve(sub1(ops().size()));
-    for (auto op = std::next(ops().begin()); op != ops().end(); ++op)
+    for (auto op = std::next(ops().cbegin()); op != ops().cend(); ++op)
         sigs.push_back(op->data_ptr());
 
     return sigs;
@@ -182,6 +182,32 @@ constexpr bool is_single_sigop(opcode code) NOEXCEPT
 constexpr bool is_multiple_sigop(opcode code) NOEXCEPT
 {
     return code == opcode::checkmultisig || code == opcode::checkmultisigverify;
+}
+
+// static
+size_t script::signature_operations(reader& source, bool accurate) NOEXCEPT
+{
+    size_t total{};
+    auto last = opcode::push_negative_1;
+
+    while (!source.is_exhausted())
+    {
+        const auto code = static_cast<opcode>(source.read_byte());
+        source.skip_bytes(operation::read_data_size(code, source));
+
+        if (is_single_sigop(code))
+        {
+            total = ceilinged_add(total, one);
+        }
+        else if (is_multiple_sigop(code))
+        {
+            total = ceilinged_add(total, multisig_sigops(accurate, last));
+        }
+
+        last = code;
+    }
+
+    return total;
 }
 
 // TODO: compute in or at script evaluation and add coinbase input scripts?

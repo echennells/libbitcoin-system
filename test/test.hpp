@@ -19,21 +19,22 @@
 #ifndef LIBBITCOIN_SYSTEM_TEST_HPP
 #define LIBBITCOIN_SYSTEM_TEST_HPP
 
-#include <boost/test/unit_test.hpp>
-
 #include <chrono>
 #include <filesystem>
 #include <memory_resource>
+#include <sstream>
 #include <bitcoin/system.hpp>
 
-/// Have slow test execution (scrypt is slow by design).
-////#define HAVE_SLOW_TESTS
-////#define HAVE_PERFORMANCE_TESTS
+#if defined(WITH_PERFORMANCE_TESTS)
+    #define HAVE_PERFORMANCE_TESTS
+#endif
+
+#if defined(WITH_SLOW_TESTS)
+    #define HAVE_SLOW_TESTS
+#endif
 
 #define TEST_NAME \
-    boost::unit_test::framework::current_test_case().p_name.get()
-#define SUITE_NAME \
-    boost::unit_test::framework::current_auto_test_suite().p_name.get()
+    ::libbitcoin::system::unit_test::session::instance().case_name()
 #define TEST_DIRECTORY \
     test::directory
 #define TEST_PATH \
@@ -85,7 +86,7 @@ namespace test {
 
 // Common directory for all test file creations.
 // Subdirectories and/or files must be differentiated (i.e. by TEST_NAME).
-// Total path length cannot exceed MAX_PATH in HAVE_MSC builds.
+// Total path length cannot exceed MAX_PATH in HAVE_WINDOWS builds.
 extern const std::string directory;
 
 bool clear(const std::filesystem::path& directory) NOEXCEPT;
@@ -99,11 +100,11 @@ struct directory_setup_fixture
 
     directory_setup_fixture() NOEXCEPT
     {
-        BOOST_REQUIRE(clear(directory));
+        BC_REQUIRE(clear(directory));
     }
     ~directory_setup_fixture() NOEXCEPT
     {
-        BOOST_REQUIRE(clear(directory));
+        BC_REQUIRE(clear(directory));
     }
 };
 

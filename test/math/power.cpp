@@ -76,16 +76,14 @@ static_assert(power(1.0, 1u) == 1.0);
 static_assert(power(2.0, 1u) == 2.0);
 static_assert(power(2.0, 2u) == 4.0);
 static_assert(power(3.0, 3u) == 27.0);
+static_assert(power(1.5, 4u) == 5.0625);
 
-// Actually 311.1696 but this is the floating point representation.
-static_assert(power(4.2, 4u) == 311.16960000000006);
-
-BOOST_AUTO_TEST_SUITE(power_tests)
+BC_AUTO_TEST_SUITE(power_tests)
 
 // uintx is not constexpr.
-BOOST_AUTO_TEST_CASE(power_uintx_tests)
+BC_AUTO_TEST_CASE(power_uintx_tests)
 {
-    BOOST_REQUIRE(true);
+    BC_REQUIRE(true);
 }
 
-BOOST_AUTO_TEST_SUITE_END()
+BC_AUTO_TEST_SUITE_END()

@@ -20,6 +20,7 @@
 #define LIBBITCOIN_SYSTEM_DATA_MEMORY_HPP
 
 #include <bitcoin/system/define.hpp>
+#include <bitcoin/system/intrinsics/intrinsics.hpp>
 
 namespace libbitcoin {
 namespace system {
@@ -147,6 +148,73 @@ template <typename Type, typename ...Args>
 inline std::unique_ptr<const Type> to_unique(Args&&... values) NOEXCEPT
 {
     return std::make_unique<const Type>(std::forward<Args>(values)...);
+}
+
+/// wipe
+/// ---------------------------------------------------------------------------
+
+/// Zero memory by volatile stores, which are not elided by the optimizer.
+inline void wipe(void* data, size_t size) NOEXCEPT
+{
+    std::fill_n(static_cast<volatile uint8_t*>(data), size, uint8_t{});
+}
+
+/// Zero a trivially copyable object (such as an array of key material).
+template <typename Type, if_trivially_copyable<Type> = true>
+inline void wipe(Type& value) NOEXCEPT
+{
+    wipe(&value, sizeof(Type));
+}
+
+/// classify
+/// ---------------------------------------------------------------------------
+
+/// Mark memory secret (undefined) to valgrind memcheck, otherwise no-op.
+BC_API void classify(const void* data, size_t size) NOEXCEPT;
+
+/// Mark memory public (defined) to valgrind memcheck, otherwise no-op.
+BC_API void declassify(const void* data, size_t size) NOEXCEPT;
+
+/// Mark a trivially copyable object secret to valgrind memcheck.
+template <typename Type, if_trivially_copyable<Type> = true>
+inline void classify(const Type& value) NOEXCEPT
+{
+    classify(&value, sizeof(Type));
+}
+
+/// Mark a trivially copyable object public to valgrind memcheck.
+template <typename Type, if_trivially_copyable<Type> = true>
+inline void declassify(const Type& value) NOEXCEPT
+{
+    declassify(&value, sizeof(Type));
+}
+
+/// Hide an integer from the optimizer, which then cannot branch on its value.
+template <typename Integer, if_integral_integer<Integer> = true>
+INLINE constexpr Integer opaque(Integer value) NOEXCEPT
+{
+#if !defined(HAVE_MSC) && !defined(HAVE_PTX)
+    if (!std::is_constant_evaluated())
+        __asm__("" : "+r"(value));
+#endif
+    return value;
+}
+
+/// Hide an extended integer from the optimizer, as with an integer.
+template <typename Extended, if_extended<Extended> = true>
+INLINE Extended opaque(Extended value) NOEXCEPT
+{
+#if !defined(HAVE_MSC) && !defined(HAVE_PTX)
+    if constexpr (have<Extended>)
+    {
+    #if defined(HAVE_NEON)
+        __asm__("" : "+w"(value));
+    #else
+        __asm__("" : "+x"(value));
+    #endif
+    }
+#endif
+    return value;
 }
 
 BC_POP_WARNING()

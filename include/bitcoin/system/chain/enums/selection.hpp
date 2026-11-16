@@ -32,7 +32,9 @@ enum class selection
     mainnet,
     testnet3,
     testnet4,
-    regtest
+    regtest,
+    signet,
+    testnet5
 };
 
 } // namespace config

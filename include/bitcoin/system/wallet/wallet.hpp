@@ -22,7 +22,11 @@
 #include <bitcoin/system/wallet/addresses/bitcoin_uri.hpp>
 #include <bitcoin/system/wallet/addresses/checked.hpp>
 #include <bitcoin/system/wallet/addresses/payment_address.hpp>
+#include <bitcoin/system/wallet/addresses/png.hpp>
 #include <bitcoin/system/wallet/addresses/qr_code.hpp>
+#include <bitcoin/system/wallet/addresses/qr_encoder.hpp>
+#include <bitcoin/system/wallet/addresses/qr_matrix.hpp>
+#include <bitcoin/system/wallet/addresses/silent_payment.hpp>
 #include <bitcoin/system/wallet/addresses/tiff.hpp>
 #include <bitcoin/system/wallet/addresses/uri.hpp>
 #include <bitcoin/system/wallet/addresses/uri_reader.hpp>
@@ -44,6 +48,7 @@
 #include <bitcoin/system/wallet/mnemonics/electrum.hpp>
 #include <bitcoin/system/wallet/mnemonics/electrum_v1.hpp>
 #include <bitcoin/system/wallet/mnemonics/mnemonic.hpp>
+#include <bitcoin/system/wallet/mnemonics/slip39.hpp>
 #include <bitcoin/system/wallet/neutrino.hpp>
 #include <bitcoin/system/wallet/point_value.hpp>
 #include <bitcoin/system/wallet/points_value.hpp>

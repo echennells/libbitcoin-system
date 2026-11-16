@@ -25,7 +25,7 @@
 namespace libbitcoin {
 namespace system {
 
-#ifdef HAVE_MSC
+#ifdef HAVE_WINDOWS
 
 // A process with no attached console (such as a service, or one started with
 // CREATE_NO_WINDOW) has no console code page or mode, and none to set.
@@ -76,9 +76,9 @@ void console_streambuf::set_output() THROWS
 
 console_streambuf::console_streambuf(const std::wstreambuf& buffer,
     size_t size) THROWS
-  : buffer_size_(size),
-    buffer_(new wchar_t[size]),
-    std::wstreambuf(buffer)
+  : std::wstreambuf(buffer),
+    buffer_size_(size),
+    buffer_(new wchar_t[size])
 {
 }
 
