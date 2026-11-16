@@ -92,7 +92,12 @@ sign(signature_t& out, const secret_t& secret, const_byte_span digest) NOEXCEPT
             auto sm = multiply(inverse(km, n), total, n);
             const auto s = from_montgomery(sm, n);
 
-            if (!is_zero(r) && !is_zero(s))
+            // The signature is public.
+            const auto r_zero = is_zero(r);
+            const auto s_zero = is_zero(s);
+            declassify(r_zero);
+            declassify(s_zero);
+            if (!r_zero && !s_zero)
             {
                 out = splice(to_bytes(r), to_bytes(s));
                 wipe(d);
@@ -163,7 +168,12 @@ TEMPLATE
 constexpr bool CLASS::
 is_scalar(const limbs_t& value) NOEXCEPT
 {
-    return !is_zero(value) && is_less(value, scalar().value);
+    // Scalar validity is public.
+    const auto nonzero = !is_zero(value);
+    const auto less = is_less(value, scalar().value);
+    declassify(nonzero);
+    declassify(less);
+    return nonzero && less;
 }
 
 // A value below 2^(8 * size), which is less than twice the order.
