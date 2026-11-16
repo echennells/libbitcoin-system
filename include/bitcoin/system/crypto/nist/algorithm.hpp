@@ -151,6 +151,12 @@ protected:
     INLINE static constexpr void select(limbs_t& out, uint64_t mask,
         const limbs_t& a, const limbs_t& b) NOEXCEPT;
     INLINE static constexpr uint64_t zero_mask(const limbs_t& a) NOEXCEPT;
+
+    /// Release a value from constant time analysis, as public by definition
+    /// or of negligible dependence on secrets.
+    template <typename Value>
+    static constexpr void declassify(const Value& value) NOEXCEPT;
+
     static constexpr bool is_zero(const limbs_t& a) NOEXCEPT;
     static constexpr bool is_less(const limbs_t& a, const limbs_t& b) NOEXCEPT;
     static constexpr uint64_t sum(limbs_t& out, const limbs_t& a,

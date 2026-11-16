@@ -133,6 +133,15 @@ zero_mask(const limbs_t& a) NOEXCEPT
 }
 
 TEMPLATE
+template <typename Value>
+constexpr void CLASS::
+declassify(const Value& value) NOEXCEPT
+{
+    if (!std::is_constant_evaluated())
+        system::declassify(value);
+}
+
+TEMPLATE
 constexpr bool CLASS::
 is_zero(const limbs_t& a) NOEXCEPT
 {
